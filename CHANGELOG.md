@@ -3,6 +3,7 @@ CHANGELOG for Sulu
 
 * dev-develop
     * ENHANCEMENT #2035 [ContentBundle]       Add structure type to index
+    * FEATURE     #2056 [All]                 Better content repository initialization, deprecated sulu:phpcr:init & sulu:webspaces:init
     * BUGFIX      #2058 [ListBuilder]         Fixed cache for field-descriptor
     * ENHANCEMENT #2034 [ContentBundle]       Improved content-bundle testcases
     * ENHANCEMENT #2036 [SecurityBundle]      Introduced different permission types for different security contexts
