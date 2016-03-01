@@ -13,7 +13,6 @@ namespace Sulu\Bundle\DocumentManagerBundle\DataFixtures;
 
 use Sulu\Bundle\DocumentManagerBundle\Initializer\Initializer;
 use Sulu\Component\DocumentManager\DocumentManager;
-use Sulu\Component\DocumentManager\NodeManager;
 use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -32,27 +31,19 @@ class DocumentExecutor
     private $documentManager;
 
     /**
-     * @var NodeManager
-     */
-    private $nodeManager;
-
-    /**
      * @var Initializer
      */
     private $initializer;
 
     /**
      * @param DocumentManager $documentManager
-     * @param NodeManager     $nodeManager
      * @param Initializer     $initializer
      */
     public function __construct(
         DocumentManager $documentManager,
-        NodeManager $nodeManager,
         Initializer $initializer
     ) {
         $this->documentManager = $documentManager;
-        $this->nodeManager = $nodeManager;
         $this->initializer = $initializer;
     }
 
