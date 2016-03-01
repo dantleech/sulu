@@ -15,7 +15,11 @@ use Sulu\Bundle\DocumentManagerBundle\Initializer\Initializer;
 use Sulu\Bundle\DocumentManagerBundle\Initializer\InitializerInterface;
 use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Sulu\Bundle\DocumentManagerBundle\Initializer\PurgerInterface;
 
+/**
+ * TODO: Test purge
+ */
 class InitializerTest extends \PHPUnit_Framework_TestCase
 {
     public function setUp()
@@ -24,9 +28,11 @@ class InitializerTest extends \PHPUnit_Framework_TestCase
         $this->initializer1 = $this->prophesize(InitializerInterface::class);
         $this->initializer2 = $this->prophesize(InitializerInterface::class);
         $this->initializer3 = $this->prophesize(InitializerInterface::class);
+        $this->purger = $this->prophesize(PurgerInterface::class);
 
         $this->initializer = new Initializer(
             $this->container->reveal(),
+            $this->purger->reveal(),
             [
                 'service1' => 50,
                 'service2' => 10,

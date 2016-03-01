@@ -54,7 +54,7 @@ class DocumentExecutorTest extends \PHPUnit_Framework_TestCase
     {
         $this->nodeManager->purgeWorkspace()->shouldNotBeCalled();
         $this->nodeManager->save()->shouldNotBeCalled();
-        $this->initializer->initialize($this->output)->shouldBeCalled();
+        $this->initializer->initialize($this->output, false)->shouldBeCalled();
         $this->executer->execute([], false, true, $this->output);
     }
 
