@@ -13,12 +13,12 @@ namespace vendor\sulu\sulu\src\Sulu\Bundle\DocumentManagerBundle\Tests\Unit\Init
 
 use Sulu\Bundle\DocumentManagerBundle\Initializer\Initializer;
 use Sulu\Bundle\DocumentManagerBundle\Initializer\InitializerInterface;
+use Sulu\Bundle\DocumentManagerBundle\Initializer\PurgerInterface;
 use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Sulu\Bundle\DocumentManagerBundle\Initializer\PurgerInterface;
 
 /**
- * TODO: Test purge
+ * TODO: Test purge.
  */
 class InitializerTest extends \PHPUnit_Framework_TestCase
 {
