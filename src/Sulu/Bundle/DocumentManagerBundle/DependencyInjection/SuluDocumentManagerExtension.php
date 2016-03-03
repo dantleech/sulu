@@ -75,12 +75,23 @@ class SuluDocumentManagerExtension extends Extension implements PrependExtension
         $container->setParameter('sulu_document_manager.default_manager', $defaultManager);
 
         $managerMap = [];
+        $debug = $config['debug'];
+        $container->setParameter('sulu_document_manager.managers', array_keys($config['managers']));
 
         foreach ($config['managers'] as $name => $manager) {
+            // configure the event dispatcher
+            $abstractDispatcherId = $debug ? 'sulu_document_manager.abstract_event_dispatcher.debug' : 'sulu_document_manager.abstract_event_dispatcher.standard';
+            $dispatcherId = sprintf('sulu_document_manager.event_dispatcher.%s', $name);
+            $dispatcherDef = new DefinitionDecorator($abstractDispatcherId);
+            $dispatcherDef->setPublic(false);
+            $container->setDefinition($dispatcherId, $dispatcherDef);
+
+            // configure the document manager
             $phpcrSessionId = sprintf('doctrine_phpcr.%s_session', $manager['session']);
             $managerId = sprintf('sulu_document_manager.document_manager.%s', $name);
             $managerDef = new DefinitionDecorator('sulu_document_manager.abstract_document_manager');
             $managerDef->replaceArgument(0, new Reference($phpcrSessionId));
+            $managerDef->replaceArgument(1, new Reference($dispatcherId));
             $container->setDefinition($managerId, $managerDef);
             $managerMap[$name] = $managerId;
         }
@@ -89,15 +100,11 @@ class SuluDocumentManagerExtension extends Extension implements PrependExtension
         $registryDef->replaceArgument(1, $managerMap);
 
         $container->setAlias('sulu_document_manager.document_manager', 'sulu_document_manager.document_manager.' . $defaultManager);
+        $container->setAlias('sulu_document_manager.event_dispatcher', 'sulu_document_manager.event_dispatcher.' . $defaultManager);
     }
 
     private function configureDocumentManager($config, ContainerBuilder $container)
     {
-        $debug = $config['debug'];
-
-        $dispatcherId = $debug ? 'sulu_document_manager.event_dispatcher.debug' : 'sulu_document_manager.event_dispatcher.standard';
-        $container->setAlias('sulu_document_manager.event_dispatcher', $dispatcherId);
-
         $realMapping = [];
         foreach ($config['mapping'] as $alias => $mapping) {
             $realMapping[] = array_merge([
