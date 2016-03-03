@@ -132,7 +132,6 @@ abstract class SuluTestCase extends KernelTestCase
     {
         $container = $kernel ? $kernel->getContainer() : $this->getContainer();
 
-        /** @var SessionInterface $session */
         $registry = $container->get('doctrine_phpcr');
 
         foreach ($registry->getConnections() as $session) {
