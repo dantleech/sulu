@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
+
 <container xmlns="http://symfony.com/schema/dic/services"
            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
            xsi:schemaLocation="http://symfony.com/schema/dic/services http://symfony.com/schema/dic/services/services-1.0.xsd">
+
+    <!-- TODO: All of these services should be prefixed with `sulu_content` -->
     <services>
         <!-- Subscribers -->
         <service id="sulu_content.document.subscriber.content"
@@ -89,11 +92,16 @@
             <tag name="sulu_document_manager.event_subscriber" />
         </service>
 
-        <service id="sulu_document_manager.document.subscriber.route"
-                 class="Sulu\Component\Content\Document\Subscriber\RouteSubscriber">
+        <service id="sulu_document_manager.document.subscriber.route_generating"
+                 class="Sulu\Component\Content\Document\Subscriber\RouteGeneratingSubscriber">
             <argument type="service" id="sulu_document_manager.document_manager"/>
             <argument type="service" id="sulu_document_manager.document_inspector"/>
             <argument type="service" id="sulu.phpcr.session"/>
+            <tag name="sulu_document_manager.event_subscriber" manager="default" />
+        </service>
+
+        <service id="sulu_document_manager.document.subscriber.route"
+                 class="Sulu\Component\Content\Document\Subscriber\RouteSubscriber">
             <tag name="sulu_document_manager.event_subscriber" />
         </service>
 
@@ -107,17 +115,8 @@
             <tag name="sulu_document_manager.event_subscriber" />
         </service>
 
-        <!-- Compat -->
-        <service id="sulu_document_manager.document.subscriber.compat.content_mapper"
-                 class="Sulu\Component\Content\Document\Subscriber\Compat\ContentMapperSubscriber">
-            <argument type="service" id="event_dispatcher" />
-            <argument type="service" id="sulu.content.mapper" />
-            <argument type="service" id="sulu.util.node_helper" />
-            <argument type="service" id="sulu.content.structure_manager"/>
-            <tag name="sulu_document_manager.event_subscriber" />
-        </service>
-
-        <service id="sulu_document_manager.subscriber.behavior.remove_content"
+        <!-- Dereferences nodes referencing the node properties when structures are removed -->
+        <service id="sulu_document_manager.subscriber.structure.remove"
                  class="Sulu\Component\Content\Document\Subscriber\StructureRemoveSubscriber">
             <argument type="service" id="sulu_document_manager.metadata_factory" />
             <tag name="sulu_document_manager.event_subscriber" />
@@ -128,5 +127,18 @@
             <argument>%sulu.content.language.namespace%</argument>
             <tag name="sulu_document_manager.initializer" priority="127"/>
         </service>
+
+        <!-- Compat -->
+
+        <!-- Emits legacy content mapper events. Only enabled on the `default` manager -->
+        <service id="sulu_document_manager.document.subscriber.compat.content_mapper"
+                 class="Sulu\Component\Content\Document\Subscriber\Compat\ContentMapperSubscriber">
+            <argument type="service" id="event_dispatcher" />
+            <argument type="service" id="sulu.content.mapper" />
+            <argument type="service" id="sulu.util.node_helper" />
+            <argument type="service" id="sulu.content.structure_manager"/>
+            <tag name="sulu_document_manager.event_subscriber" manager="default" />
+        </service>
+
     </services>
 </container>
