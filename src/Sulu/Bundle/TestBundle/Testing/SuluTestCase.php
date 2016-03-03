@@ -133,14 +133,12 @@ abstract class SuluTestCase extends KernelTestCase
      */
     protected function initPhpcr()
     {
-        /** @var SessionInterface $session */
         $registry = $this->getContainer()->get('doctrine_phpcr');
 
         foreach ($registry->getConnections() as $session) {
             NodeHelper::purgeWorkspace($session);
             $session->save();
         }
-
 
         if (!$this->importer) {
             $this->importer = new PHPCRImporter($this->getContainer()->get('doctrine_phpcr')->getConnection());
