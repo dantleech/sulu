@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,14 +11,12 @@
 
 namespace Sulu\Component\PHPCR\NodeTypes\Path;
 
-
 use PHPCR\NodeType\NodeDefinitionInterface;
 use PHPCR\NodeType\NodeTypeDefinitionInterface;
 use PHPCR\NodeType\PropertyDefinitionInterface;
 
 class PathNodeType implements NodeTypeDefinitionInterface
 {
-
     /**
      * Returns the name of the node type.
      *
@@ -48,9 +47,9 @@ class PathNodeType implements NodeTypeDefinitionInterface
      */
     public function getDeclaredSupertypeNames()
     {
-        return array(
-            'sulu:base'
-        );
+        return [
+            'sulu:base',
+        ];
     }
 
     /**
@@ -65,7 +64,7 @@ class PathNodeType implements NodeTypeDefinitionInterface
      * NodeTypeDefinition object is actually a newly-created empty
      * NodeTypeTemplate, then this method will return false.
      *
-     * @return boolean True, if the current type is abstract, else false.
+     * @return bool True, if the current type is abstract, else false.
      *
      * @api
      */
@@ -82,7 +81,7 @@ class PathNodeType implements NodeTypeDefinitionInterface
      * NodeTypeDefinition object is actually a newly-created empty
      * NodeTypeTemplate, then this method will return false.
      *
-     * @return boolean True if this is a mixin type, else false;
+     * @return bool True if this is a mixin type, else false;
      *
      * @api
      */
@@ -107,8 +106,8 @@ class PathNodeType implements NodeTypeDefinitionInterface
      * NodeTypeDefinitionInterface object is actually a newly-created empty
      * NodeTypeTemplateInterface, then this method will return false.
      *
-     * @return boolean True, if nodes of this type must support orderable child
-     *      nodes, else false.
+     * @return bool True, if nodes of this type must support orderable child
+     *              nodes, else false.
      *
      * @api
      */
@@ -127,7 +126,7 @@ class PathNodeType implements NodeTypeDefinitionInterface
      * If a node type is declared non-queryable then these attributes of its
      * property definitions have no effect.
      *
-     * @return boolean True, if the node type is queryable, else false.
+     * @return bool True, if the node type is queryable, else false.
      *
      * @see PropertyDefinition::getAvailableQueryOperators()
      * @see PropertyDefinition::isFullTextSearchable()
@@ -157,7 +156,7 @@ class PathNodeType implements NodeTypeDefinitionInterface
      */
     public function getPrimaryItemName()
     {
-        return null;
+        return;
     }
 
     /**
@@ -174,10 +173,10 @@ class PathNodeType implements NodeTypeDefinitionInterface
      */
     public function getDeclaredPropertyDefinitions()
     {
-        return array(
+        return [
             new ContentPropertyDefinition(),
-            new HistoryPropertyDefinition()
-        );
+            new HistoryPropertyDefinition(),
+        ];
     }
 
     /**
@@ -194,6 +193,6 @@ class PathNodeType implements NodeTypeDefinitionInterface
      */
     public function getDeclaredChildNodeDefinitions()
     {
-        return array();
+        return [];
     }
 }

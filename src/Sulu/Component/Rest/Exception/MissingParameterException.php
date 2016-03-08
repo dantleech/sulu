@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -11,7 +12,7 @@
 namespace Sulu\Component\Rest\Exception;
 
 /**
- * missing parameter in api
+ * missing parameter in api.
  */
 class MissingParameterException extends RestException
 {
@@ -24,7 +25,7 @@ class MissingParameterException extends RestException
      */
     private $controller;
 
-    function __construct($controller, $name)
+    public function __construct($controller, $name)
     {
         parent::__construct(sprintf('Missing parameter %s in %s', $name, $controller), 0);
         $this->controller = $controller;
@@ -46,4 +47,4 @@ class MissingParameterException extends RestException
     {
         return $this->name;
     }
-} 
+}

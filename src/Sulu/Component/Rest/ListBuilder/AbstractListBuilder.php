@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,86 +11,182 @@
 
 namespace Sulu\Component\Rest\ListBuilder;
 
-use Sulu\Component\Rest\ListBuilder\FieldDescriptor\AbstractFieldDescriptor;
+use Sulu\Component\Rest\ListBuilder\Expression\ExpressionInterface;
+use Sulu\Component\Rest\ListBuilder\Metadata\General\PropertyMetadata;
 
 abstract class AbstractListBuilder implements ListBuilderInterface
 {
     /**
-     * The field descriptors for the current list
-     * @var AbstractFieldDescriptor[]
+     * The field descriptors for the current list.
+     *
+     * @var FieldDescriptorInterface[]
      */
-    protected $fields = array();
+    protected $selectFields = [];
 
     /**
-     * The field descriptors for the field, which will be used for the search
-     * @var AbstractFieldDescriptor[]
+     * The field descriptors for the field, which will be used for the search.
+     *
+     * @var FieldDescriptorInterface[]
      */
-    protected $searchFields = array();
+    protected $searchFields = [];
 
     /**
-     * The value for which the searchfields will be searched
+     * The value for which the searchfields will be searched.
+     *
      * @var string
      */
     protected $search;
 
     /**
-     * The field descriptor for the field to sort
-     * @var AbstractFieldDescriptor
+     * The field descriptor for the field to sort.
+     *
+     * @var FieldDescriptorInterface[]
      */
-    protected $sortField = null;
+    protected $sortFields = [];
 
     /**
-     * Defines the sort order of the string
-     * @var string
+     * Defines the sort order of the string.
+     *
+     * @var string[]
      */
-    protected $sortOrder;
+    protected $sortOrders;
 
     /**
-     * The limit for this query
-     * @var integer
+     * The limit for this query.
+     *
+     * @var int
      */
     protected $limit = null;
 
     /**
-     * The fields to be checked
+     * group by fields.
+     *
      * @var array
      */
-    protected $whereFields = array();
+    protected $groupByFields = [];
 
     /**
-     * The values the where fields should have
-     * @var array
-     */
-    protected $whereValues = array();
-
-    /**
-     * The page the resulting query will be returning
-     * @var integer
+     * The page the resulting query will be returning.
+     *
+     * @var int
      */
     protected $page = 1;
 
     /**
-     * {@inheritDoc}
+     * All field descriptors for the current context.
+     *
+     * @var FieldDescriptorInterface[]
      */
-    public function setFields($fieldDescriptors)
+    protected $fieldDescriptors = [];
+
+    /**
+     * @var ExpressionInterface[]
+     */
+    protected $expressions = [];
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setSelectFields($fieldDescriptors)
     {
-        $this->fields = $fieldDescriptors;
+        $this->selectFields = array_filter(
+            $fieldDescriptors,
+            function (FieldDescriptorInterface $fieldDescriptor) {
+                if (null === $fieldDescriptor->getMetadata()
+                    || !$fieldDescriptor->getMetadata()->has(PropertyMetadata::class)
+                ) {
+                    return true;
+                }
+
+                /** @var PropertyMetadata $propertyMetadata */
+                $propertyMetadata = $fieldDescriptor->getMetadata()->get(PropertyMetadata::class);
+
+                return $propertyMetadata->getDisplay() === PropertyMetadata::DISPLAY_YES
+                    || $propertyMetadata->getDisplay() === PropertyMetadata::DISPLAY_ALWAYS;
+            }
+        );
     }
 
     /**
-     * {@inheritDoc}
+     * @deprecated use setSelectFields instead
      */
-    public function addField(AbstractFieldDescriptor $fieldDescriptor)
+    public function setFields($fieldDescriptors)
     {
-        $this->fields[] = $fieldDescriptor;
+        $this->selectFields = $fieldDescriptors;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function addSelectField(FieldDescriptorInterface $fieldDescriptor)
+    {
+        $this->selectFields[$fieldDescriptor->getName()] = $fieldDescriptor;
 
         return $this;
     }
 
     /**
-     * {@inheritDoc}
+     * @deprecated use addSelectField instead
      */
-    public function addSearchField(AbstractFieldDescriptor $fieldDescriptor)
+    public function addField(FieldDescriptorInterface $fieldDescriptor)
+    {
+        $this->selectFields[$fieldDescriptor->getName()] = $fieldDescriptor;
+
+        return $this;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getSelectField($fieldName)
+    {
+        if (array_key_exists($fieldName, $this->selectFields)) {
+            return $this->selectFields[$fieldName];
+        }
+
+        return;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function hasSelectField($name)
+    {
+        return array_key_exists($name, $this->selectFields);
+    }
+
+    /**
+     * @deprecated use hasSelectField instead
+     */
+    public function hasField($name)
+    {
+        return array_key_exists($name, $this->selectFields);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setFieldDescriptors(array $fieldDescriptors)
+    {
+        $this->fieldDescriptors = $fieldDescriptors;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getFieldDescriptor($fieldName)
+    {
+        if (array_key_exists($fieldName, $this->fieldDescriptors)) {
+            return $this->fieldDescriptors[$fieldName];
+        }
+
+        return;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function addSearchField(FieldDescriptorInterface $fieldDescriptor)
     {
         $this->searchFields[] = $fieldDescriptor;
 
@@ -97,7 +194,7 @@ abstract class AbstractListBuilder implements ListBuilderInterface
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function search($search)
     {
@@ -105,18 +202,18 @@ abstract class AbstractListBuilder implements ListBuilderInterface
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
-    public function sort(AbstractFieldDescriptor $fieldDescriptor, $order = self::SORTORDER_ASC)
+    public function sort(FieldDescriptorInterface $fieldDescriptor, $order = self::SORTORDER_ASC)
     {
-        $this->sortField = $fieldDescriptor;
-        $this->sortOrder = $order;
+        $this->sortFields[] = $fieldDescriptor;
+        $this->sortOrders[] = $order;
 
         return $this;
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function limit($limit)
     {
@@ -126,7 +223,7 @@ abstract class AbstractListBuilder implements ListBuilderInterface
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function getLimit()
     {
@@ -134,7 +231,7 @@ abstract class AbstractListBuilder implements ListBuilderInterface
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function setCurrentPage($page)
     {
@@ -144,7 +241,7 @@ abstract class AbstractListBuilder implements ListBuilderInterface
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function getCurrentPage()
     {
@@ -152,11 +249,66 @@ abstract class AbstractListBuilder implements ListBuilderInterface
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
-    public function where(AbstractFieldDescriptor $fieldDescriptor, $value)
+    public function where(FieldDescriptorInterface $fieldDescriptor, $value, $comparator = self::WHERE_COMPARATOR_EQUAL)
     {
-        $this->whereFields[$fieldDescriptor->getName()] = $fieldDescriptor;
-        $this->whereValues[$fieldDescriptor->getName()] = $value;
+        $this->expressions[] = $this->createWhereExpression($fieldDescriptor, $value, $comparator);
+        $this->addFieldDescriptor($fieldDescriptor);
+    }
+
+    /**
+     * @deprecated use where instead
+     *
+     * {@inheritdoc}
+     */
+    public function whereNot(FieldDescriptorInterface $fieldDescriptor, $value)
+    {
+        $this->expressions[] = $this->createWhereExpression($fieldDescriptor, $value, self::WHERE_COMPARATOR_UNEQUAL);
+        $this->addFieldDescriptor($fieldDescriptor);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function in(FieldDescriptorInterface $fieldDescriptor, array $values)
+    {
+        $this->expressions[] = $this->createInExpression($fieldDescriptor, $values);
+        $this->addFieldDescriptor($fieldDescriptor);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function between(FieldDescriptorInterface $fieldDescriptor, array $values)
+    {
+        $this->expressions[] = $this->createBetweenExpression($fieldDescriptor, $values);
+        $this->addFieldDescriptor($fieldDescriptor);
+    }
+
+    /**
+     * Adds a field descriptor.
+     *
+     * @param FieldDescriptorInterface $fieldDescriptor
+     */
+    protected function addFieldDescriptor(FieldDescriptorInterface $fieldDescriptor)
+    {
+        $this->fieldDescriptors[$fieldDescriptor->getName()] = $fieldDescriptor;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function addGroupBy(FieldDescriptorInterface $fieldDescriptor)
+    {
+        $this->groupByFields[$fieldDescriptor->getName()] = $fieldDescriptor;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function addExpression(ExpressionInterface $expression)
+    {
+        $this->expressions[] = $expression;
     }
 }

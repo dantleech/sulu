@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,9 +11,8 @@
 
 namespace Sulu\Component\Content\Exception;
 
-
+use Sulu\Component\Content\Compat\PropertyInterface;
 use Sulu\Component\Content\ContentTypeInterface;
-use Sulu\Component\Content\PropertyInterface;
 
 class UnexpectedPropertyType extends \Exception
 {
@@ -26,7 +26,7 @@ class UnexpectedPropertyType extends \Exception
      */
     private $contentType;
 
-    function __construct(PropertyInterface $property, ContentTypeInterface $contentType)
+    public function __construct(PropertyInterface $property, ContentTypeInterface $contentType)
     {
         parent::__construct(sprintf('Property "%s" is unexcepted in content type "%s"', $property->getName(), get_class($contentType)));
         $this->property = $property;
@@ -48,6 +48,4 @@ class UnexpectedPropertyType extends \Exception
     {
         return $this->contentType;
     }
-
-
 }

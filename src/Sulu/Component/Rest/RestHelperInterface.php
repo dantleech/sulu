@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,31 +11,32 @@
 
 namespace Sulu\Component\Rest;
 
-use Sulu\Bundle\CoreBundle\Entity\ApiEntity;
-use Sulu\Component\Rest\ListBuilder\FieldDescriptor\AbstractFieldDescriptor;
+use Sulu\Component\Rest\ListBuilder\AbstractFieldDescriptor;
 use Sulu\Component\Rest\ListBuilder\ListBuilderInterface;
 use Traversable;
 
 interface RestHelperInterface
 {
     /**
-     * Initializes the given ListBuilder with the standard values from the request
-     * @param ListBuilderInterface $listBuilder The ListBuilder to initialize
+     * Initializes the given ListBuilder with the standard values from the request.
+     *
+     * @param ListBuilderInterface      $listBuilder      The ListBuilder to initialize
      * @param AbstractFieldDescriptor[] $fieldDescriptors The FieldDescriptors available for this object type
      */
     public function initializeListBuilder(ListBuilderInterface $listBuilder, array $fieldDescriptors);
 
     /**
      * This method processes a put request (delete non-existing entities, update existing entities, add new
-     * entries), and let the single actions be modified by callbacks
-     * @param Traversable $entities The list of entities to work on
-     * @param array $requestEntities The entities as retrieved from the request
-     * @param callable $get The
-     * @param callable $add
-     * @param callable $update
-     * @param callable $delete
+     * entries), and let the single actions be modified by callbacks.
+     *
+     * @param Traversable $entities        The list of entities to work on
+     * @param array       $requestEntities The entities as retrieved from the request
+     * @param callable    $get             The
+     * @param callable    $add
+     * @param callable    $update
+     * @param callable    $delete
+     *
      * @return bool
-     * @deprecated
      */
     public function processSubEntities(
         $entities,

@@ -1,0 +1,26 @@
+{
+  "name": "sulu-admin",
+  "version": "1.1.9",
+  "homepage": "https://github.com/massiveart/SuluAdminBundle",
+  "authors": [],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "backbone-relational": "0.8.*",
+    "globalize": "0.1.*",
+    "husky": "0.18.*",
+    "jquery": "1.10.*",
+    "require-css": "~0.1.8"
+  },
+  "resolutions": {
+    "jquery": "1.10.*",
+    "backbone": "1.1.*",
+    "underscore": "1.5.*"
+  }
+}

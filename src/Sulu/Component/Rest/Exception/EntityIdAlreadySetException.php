@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -11,26 +12,27 @@
 namespace Sulu\Component\Rest\Exception;
 
 /**
- * This exception should be thrown when an Entity id already has been set
- * @package Sulu\Bundle\CoreBundle\Controller\Exception
+ * This exception should be thrown when an Entity id already has been set.
  */
 class EntityIdAlreadySetException extends RestException
 {
     /**
-     * The type of the entity, which was not found
+     * The type of the entity, which was not found.
+     *
      * @var string
      */
     protected $entity;
 
     /**
-     * The id of the entity, which was not found
+     * The id of the entity, which was not found.
+     *
      * @var int
      */
     protected $id;
 
     /**
      * @param string $entity The type of the entity, which was not found
-     * @param int $id The id of the entity, which was not found
+     * @param int    $id     The id of the entity, which was not found
      */
     public function __construct($entity, $id)
     {
@@ -41,7 +43,8 @@ class EntityIdAlreadySetException extends RestException
     }
 
     /**
-     * Returns the type of the entity, for which the id was already set
+     * Returns the type of the entity, for which the id was already set.
+     *
      * @return string
      */
     public function getEntity()
@@ -50,7 +53,8 @@ class EntityIdAlreadySetException extends RestException
     }
 
     /**
-     * Returns the id of the entity, for which the id was already set
+     * Returns the id of the entity, for which the id was already set.
+     *
      * @return int
      */
     public function getId()

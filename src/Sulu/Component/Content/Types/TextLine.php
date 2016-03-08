@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,16 +11,18 @@
 
 namespace Sulu\Component\Content\Types;
 
+use Sulu\Component\Content\Compat\PropertyInterface;
+use Sulu\Component\Content\Compat\PropertyParameter;
 use Sulu\Component\Content\SimpleContentType;
 
 /**
- * ContentType for TextLine
+ * ContentType for TextLine.
  */
 class TextLine extends SimpleContentType
 {
     private $template;
 
-    function __construct($template)
+    public function __construct($template)
     {
         parent::__construct('TextLine', '');
 
@@ -27,11 +30,22 @@ class TextLine extends SimpleContentType
     }
 
     /**
-     * returns a template to render a form
+     * returns a template to render a form.
+     *
      * @return string
      */
     public function getTemplate()
     {
         return $this->template;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getDefaultParams(PropertyInterface $property = null)
+    {
+        return [
+            'headline' => new PropertyParameter('headline', false),
+        ];
     }
 }

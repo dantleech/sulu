@@ -1,0 +1,12 @@
+sulu_media.collections:
+    type: rest
+    resource: Sulu\Bundle\MediaBundle\Controller\CollectionController
+
+sulu_media.media:
+    type: rest
+    resource: Sulu\Bundle\MediaBundle\Controller\MediaController
+
+sulu_media.media_preview:
+    type: rest
+    parent: sulu_media.media
+    resource: Sulu\Bundle\MediaBundle\Controller\MediaPreviewController

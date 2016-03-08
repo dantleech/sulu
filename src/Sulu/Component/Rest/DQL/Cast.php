@@ -1,12 +1,18 @@
 <?php
 
-namespace Sulu\Component\Rest\DQL;
+/*
+ * This file is part of Sulu.
+ *
+ * (c) MASSIVE ART WebServices GmbH
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
 
+namespace Sulu\Component\Rest\DQL;
 
 use Doctrine\ORM\Query\AST\Functions\FunctionNode;
 use Doctrine\ORM\Query\Lexer;
-use Doctrine\ORM\Query\SqlWalker;
-use Doctrine\ORM\Query\Parser;
 
 class Cast extends FunctionNode
 {
@@ -30,6 +36,6 @@ class Cast extends FunctionNode
 
     public function getSql(\Doctrine\ORM\Query\SqlWalker $sqlWalker)
     {
-        return sprintf('CAST(%s AS %s)',  $this->firstDateExpression->dispatch($sqlWalker), $this->unit);
+        return sprintf('CAST(%s AS %s)', $this->firstDateExpression->dispatch($sqlWalker), $this->unit);
     }
 }

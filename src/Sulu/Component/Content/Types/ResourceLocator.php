@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -11,15 +12,14 @@
 namespace Sulu\Component\Content\Types;
 
 use PHPCR\NodeInterface;
+use Sulu\Component\Content\Compat\PropertyInterface;
 use Sulu\Component\Content\ComplexContentType;
 use Sulu\Component\Content\ContentTypeInterface;
 use Sulu\Component\Content\Exception\ResourceLocatorNotFoundException;
-use Sulu\Component\Content\PropertyInterface;
 use Sulu\Component\Content\Types\Rlp\Strategy\RLPStrategyInterface;
 
 /**
- * Class ResourceLocator
- * @package Sulu\Component\Content\Types
+ * Class ResourceLocator.
  */
 class ResourceLocator extends ComplexContentType implements ResourceLocatorInterface
 {
@@ -29,12 +29,13 @@ class ResourceLocator extends ComplexContentType implements ResourceLocatorInter
     private $strategy;
 
     /**
-     * template for form generation
+     * template for form generation.
+     *
      * @var string
      */
     private $template;
 
-    function __construct(RlpStrategyInterface $strategy, $template)
+    public function __construct(RlpStrategyInterface $strategy, $template)
     {
         $this->strategy = $strategy;
         $this->template = $template;
@@ -43,10 +44,32 @@ class ResourceLocator extends ComplexContentType implements ResourceLocatorInter
     /**
      * {@inheritdoc}
      */
-    public function read(NodeInterface $node, PropertyInterface $property, $webspaceKey, $languageCode, $segmentKey = null)
+    public function read(
+        NodeInterface $node,
+        PropertyInterface $property,
+        $webspaceKey,
+        $languageCode,
+        $segmentKey = null
+    ) {
+        if ($node->hasProperty($property->getName())) {
+            $value = $node->getPropertyValue($property->getName());
+
+            $property->setValue($value);
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function hasValue(NodeInterface $node, PropertyInterface $property, $webspaceKey, $languageCode, $segmentKey)
     {
-        $value = $this->getResourceLocator($node, $webspaceKey, $languageCode, $segmentKey);
-        $property->setValue($value);
+        try {
+            $this->getResourceLocator($node, $webspaceKey, $languageCode, $segmentKey);
+
+            return true;
+        } catch (ResourceLocatorNotFoundException $ex) {
+            return false;
+        }
     }
 
     /**
@@ -58,12 +81,7 @@ class ResourceLocator extends ComplexContentType implements ResourceLocatorInter
     }
 
     /**
-     * reads the value for given property out of the database + sets the value of the property
-     * @param NodeInterface $node
-     * @param string $webspaceKey
-     * @param string $languageCode
-     * @param string $segmentKey
-     * @return string
+     * {@inheritdoc}
      */
     public function getResourceLocator(NodeInterface $node, $webspaceKey, $languageCode, $segmentKey = null)
     {
@@ -77,12 +95,7 @@ class ResourceLocator extends ComplexContentType implements ResourceLocatorInter
     }
 
     /**
-     * reads the value for given property out of the database + sets the value of the property
-     * @param string $uuid
-     * @param string $webspaceKey
-     * @param string $languageCode
-     * @param string $segmentKey
-     * @return string
+     * {@inheritdoc}
      */
     public function getResourceLocatorByUuid($uuid, $webspaceKey, $languageCode, $segmentKey = null)
     {
@@ -112,11 +125,7 @@ class ResourceLocator extends ComplexContentType implements ResourceLocatorInter
     }
 
     /**
-     * restore given resource locator
-     * @param string $path of resource locator
-     * @param string $webspaceKey key of portal
-     * @param string $languageCode
-     * @param string $segmentKey
+     * {@inheritdoc}
      */
     public function restoreByPath($path, $webspaceKey, $languageCode, $segmentKey = null)
     {
@@ -133,38 +142,56 @@ class ResourceLocator extends ComplexContentType implements ResourceLocatorInter
         $webspaceKey,
         $languageCode,
         $segmentKey = null
-    )
-    {
+    ) {
         $value = $property->getValue();
-        if ($value != null && $value != '') {
-            $old = $this->getResourceLocator($node, $webspaceKey, $languageCode, $segmentKey);
-            if ($old !== '/') {
-                if ($old != null) {
-                    $this->getStrategy()->move($old, $value, $webspaceKey, $languageCode, $segmentKey);
-                } else {
-                    $this->getStrategy()->save($node, $value, $webspaceKey, $languageCode, $segmentKey);
-                }
-            }
-        } else {
+
+        if ($value === null || $value === '') {
             $this->remove($node, $property, $webspaceKey, $languageCode, $segmentKey);
+
+            return;
         }
+
+        $treeValue = $this->getResourceLocator($node, $webspaceKey, $languageCode, $segmentKey);
+        if ($treeValue === '/') {
+            return;
+        }
+
+        // only if property value is the same as tree value (is different in move / copy / rename workflow)
+        // or the tree value does not exist
+        if ($treeValue === null) {
+            $this->getStrategy()->save($node, $value, $userId, $webspaceKey, $languageCode, $segmentKey);
+        } elseif ($treeValue !== $value) {
+            $this->getStrategy()->move(
+                $treeValue,
+                $value,
+                $node,
+                $userId,
+                $webspaceKey,
+                $languageCode,
+                $segmentKey
+            );
+        }
+
+        $node->setProperty($property->getName(), $value);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function remove(NodeInterface $node, PropertyInterface $property, $webspaceKey, $languageCode, $segmentKey=null)
-    {
-        // TODO: Implement remove() method.
+    public function remove(
+        NodeInterface $node,
+        PropertyInterface $property,
+        $webspaceKey,
+        $languageCode,
+        $segmentKey = null
+    ) {
+        if ($node->hasProperty($property->getName())) {
+            $node->getProperty($property->getName())->remove();
+        }
     }
 
     /**
-     * returns the node uuid of referenced content node
-     * @param string $resourceLocator
-     * @param string $webspaceKey
-     * @param string $languageCode
-     * @param string $segmentKey
-     * @return string
+     * {@inheritdoc}
      */
     public function loadContentNodeUuid($resourceLocator, $webspaceKey, $languageCode, $segmentKey = null)
     {
@@ -172,8 +199,7 @@ class ResourceLocator extends ComplexContentType implements ResourceLocatorInter
     }
 
     /**
-     * returns strategy of current portal
-     * @return RLPStrategyInterface
+     * {@inheritdoc}
      */
     public function getStrategy()
     {
@@ -182,9 +208,7 @@ class ResourceLocator extends ComplexContentType implements ResourceLocatorInter
     }
 
     /**
-     * returns type of ContentType
-     * PRE_SAVE or POST_SAVE
-     * @return int
+     * {@inheritdoc}
      */
     public function getType()
     {
@@ -192,8 +216,7 @@ class ResourceLocator extends ComplexContentType implements ResourceLocatorInter
     }
 
     /**
-     * returns a template to render a form
-     * @return string
+     * {@inheritdoc}
      */
     public function getTemplate()
     {

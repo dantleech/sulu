@@ -1,0 +1,15 @@
+massive_search:
+    adapter: test
+
+sulu_media:
+    search:
+        enabled: true
+    format_manager:
+        response_headers:
+            Expires: "+1 month"
+
+# Doctrine Configuration
+doctrine:
+    orm:
+        resolve_target_entities:
+            Sulu\Bundle\MediaBundle\Entity\CollectionInterface: Sulu\Bundle\MediaBundle\Entity\Collection

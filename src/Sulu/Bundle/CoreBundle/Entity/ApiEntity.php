@@ -1,28 +1,38 @@
 <?php
+
+/*
+ * This file is part of Sulu.
+ *
+ * (c) MASSIVE ART WebServices GmbH
+ *
+ * This source file is subject to the MIT license that is bundled
+ * with this source code in the file LICENSE.
+ */
+
 namespace Sulu\Bundle\CoreBundle\Entity;
 
 use Doctrine\Common\Inflector\Inflector;
-use JMS\Serializer\Annotation\VirtualProperty;
-use JMS\Serializer\Annotation\SerializedName;
-use JMS\Serializer\Annotation\Exclude;
 use JMS\Serializer\Annotation\Accessor;
+use JMS\Serializer\Annotation\Exclude;
 
 /**
- * An abstract class for Entities, defining some links
- * @package Sulu\Bundle\CoreBundle\Entity
+ * An abstract class for Entities, defining some links.
+ *
  * @deprecated
  */
 abstract class ApiEntity
 {
     /**
-     * general base path of entities
+     * general base path of entities.
+     *
      * @var string
      * @Exclude
      */
     protected $apiBasePath = '/admin/api';
 
     /**
-     * $apiPath must be overriden by base entity
+     * $apiPath must be overriden by base entity.
+     *
      * @var string
      * @Exclude
      */
@@ -35,14 +45,17 @@ abstract class ApiEntity
     private $id;
 
     /**
-     * property to be shown in serialized object
+     * property to be shown in serialized object.
+     *
      * @Accessor(getter="getLinks")
+     *
      * @var string
      */
     private $_links;
 
     /**
-     * returns the id of an entity
+     * returns the id of an entity.
+     *
      * @return mixed
      */
     public function getId()
@@ -63,7 +76,7 @@ abstract class ApiEntity
     }
 
     /**
-     * creates the _links array including the self path
+     * creates the _links array including the self path.
      */
     public function createSelfLink()
     {
@@ -79,9 +92,9 @@ abstract class ApiEntity
         if ($this->getId()) {
             $idPath = '/' . $this->getId();
         }
-        $this->_links = array(
+        $this->_links = [
             'self' => $this->getApiPath() . $idPath,
-        );
+        ];
     }
 
     /**
@@ -93,7 +106,8 @@ abstract class ApiEntity
     }
 
     /**
-     * returns if api path is set
+     * returns if api path is set.
+     *
      * @return bool
      */
     public function hasApiPath()

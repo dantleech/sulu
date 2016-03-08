@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -13,7 +14,7 @@ namespace Sulu\Component\Content\Types\Rlp;
 use DateTime;
 
 /**
- * holds information for one Resourcelocator and his history
+ * holds information for one Resourcelocator and his history.
  */
 class ResourceLocatorInformation
 {
@@ -32,7 +33,7 @@ class ResourceLocatorInformation
      */
     private $id;
 
-    function __construct($resourceLocator, $created, $id)
+    public function __construct($resourceLocator, $created, $id)
     {
         $this->created = $created;
         $this->resourceLocator = $resourceLocator;
@@ -40,7 +41,8 @@ class ResourceLocatorInformation
     }
 
     /**
-     * returns datetime of creation
+     * returns datetime of creation.
+     *
      * @return \DateTime
      */
     public function getCreated()
@@ -49,7 +51,8 @@ class ResourceLocatorInformation
     }
 
     /**
-     * returns resource locator string
+     * returns resource locator string.
+     *
      * @return string
      */
     public function getResourceLocator()

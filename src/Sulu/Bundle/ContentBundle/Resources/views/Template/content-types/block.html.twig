@@ -1,0 +1,79 @@
+<div class="grid-col-{{ property.colspan != "" ? property.colspan : '12' }} floating m-top-20">
+    <h2 class="light">{{ property.getTitle(userLocale) }}</h2>
+
+    <div class="grid">
+        <div id="text-block-header-{{ id|raw }}" class="text-blocks-header">
+            <div id="collapse-text-blocks-{{ id|raw }}" tabindex="0" class="text-blocks-toggle-btn"><%=
+                translate('sulu.content.collapse.blocks') %>
+            </div>
+            <div id="expand-text-blocks-{{ id|raw }}" tabindex="0" class="text-blocks-toggle-btn"><%=
+                translate('sulu.content.expand.blocks') %>
+            </div>
+            <div class="clear"></div>
+        </div>
+        <div class="grid-row small"
+             id="{{ id|raw }}"
+             data-form="true"
+             data-type="block"
+             data-type-config='[{% for type in property.types %}{"data": "{{ type.name }}", "title": "{{ type.getTitle(userLocale) }}", "tpl": "{{ type.name }}-{{ id|raw }}-tpl"}{{ loop.last==false?',':'' }}{% endfor %}]'
+             data-type-min="{{ property.minOccurs }}"
+             data-type-max="{{ property.maxOccurs }}"
+             data-type-default="{{ property.defaultTypeName }}"
+             data-mapper-property="{{ property.name }}"
+             data-mapper-full-class="full"
+             data-mapper-empty-class="empty">
+            {% for type in property.types %}
+                <script id="{{ type.name }}-{{ id|raw }}-tpl" type="text/template">
+                    <div class="text-block {{ type.name }}-element {{ property.name }}-element"
+                         data-mapper-property-tpl="{{ type.name }}">
+                        <div class="move"></div>
+                        <input type="hidden" data-mapper-property="type" value="{{ type.name }}"/>
+
+                        <div class="collapsed-container empty">
+                            {% if property.types|length > 1 %}
+                                <div class="type">{{ type.getTitle(userLocale) }}</div>
+                            {% endif %}
+                            <div class="title"></div>
+                            <div class="image"></div>
+                            <div class="text hidden"></div>
+                        </div>
+
+                        <div class="container grid pos-rel">
+                            <div class="text-block-controls pull-right">
+                                <div class="fa-eye-slash options-collapse"></div>
+                                <div data-mapper-remove="{{ property.name }}"
+                                     class="fa-times options-remove mapper-remove-{{ type.name }}"></div>
+                                <div class="clear"></div>
+                            </div>
+                            <div class="grid-row small">
+                                <div class="grid-col-3 m-top-10 floating form-group hidden">
+                                    <div class="type-select"></div>
+                                </div>
+                            </div>
+                            <div class="block block-{{ property.name }} grid-row small">
+                                {% for child in type.childProperties %}
+
+                                    {# get Type for property #}
+                                    {% set type = sulu_get_type(child.contentTypeName) %}
+                                    {# get params for property #}
+                                    {% set params = sulu_get_params(child) %}
+
+                                    {% if child is multiple %}
+                                        {% include 'SuluContentBundle:Template:macros/multiple.html.twig' with {'property': child, 'params': params, 'type': type, 'id': id ~ '-' ~ child.name ~ '<~=index~>', 'webspaceKey': webspaceKey, 'languageCode': languageCode, 'userLocale': userLocale} only %}
+                                    {% else %}
+                                        {% include 'SuluContentBundle:Template:macros/single.html.twig' with {'property': child, 'params': params, 'type': type, 'id': id ~ '-' ~ child.name ~ '<~=index~>', 'webspaceKey': webspaceKey, 'languageCode': languageCode, 'userLocale': userLocale} only %}
+                                    {% endif %}
+                                {% endfor %}
+                                <div class="clear"></div>
+                            </div>
+                        </div>
+                    </div>
+                </script>
+            {% endfor %}
+        </div>
+
+        <div class="text-block-footer" id="{{ id|raw }}-add" style="width: 200px">
+
+        </div>
+    </div>
+</div>

@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,62 +11,74 @@
 
 namespace Sulu\Bundle\CoreBundle\DependencyInjection\Compiler;
 
+use Sulu\Component\HttpKernel\SuluKernel;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
-use Symfony\Component\EventDispatcher\ContainerAwareEventDispatcher;
 
 /**
- * CompilerPass, which adds the request analyzer as a service if required
- * @package Sulu\Bundle\CoreBundle\DependencyInjection\Compiler
+ * CompilerPass, which adds the request analyzer as a service if required.
  */
 class RequestAnalyzerCompilerPass implements CompilerPassInterface
 {
-
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function process(ContainerBuilder $container)
     {
-        // Check if request analyzer service is enable in configuration
-        if ($container->getParameter('sulu_core.webspace.request_analyzer.enabled') == true) {
-            // set request analyzer
-            $container->setDefinition(
-                'sulu_core.webspace.request_analyzer',
-                new Definition(
-                    'Sulu\Component\Webspace\Analyzer\RequestAnalyzer',
-                    array(
-                        new Reference('sulu_core.webspace.webspace_manager'),
-                        $container->getParameter('kernel.environment')
-                    )
-                )
-            );
+        // set website request analyzer
+        $container->setDefinition(
+            'sulu_core.webspace.request_analyzer.website',
+            new Definition(
+                'Sulu\Component\Webspace\Analyzer\WebsiteRequestAnalyzer',
+                [
+                    new Reference('sulu_core.webspace.webspace_manager'),
+                    $container->getParameter('kernel.environment'),
+                ]
+            )
+        );
+        // set admin request analyzer
+        $container->setDefinition(
+            'sulu_core.webspace.request_analyzer.admin',
+            new Definition(
+                'Sulu\Component\Webspace\Analyzer\AdminRequestAnalyzer',
+                [
+                    new Reference('sulu_core.webspace.webspace_manager'),
+                    $container->getParameter('kernel.environment'),
+                ]
+            )
+        );
 
-            // set listener
-            $container->setDefinition(
-                'sulu_core.webspace.request_listener',
-                new Definition(
-                    'Sulu\Component\Webspace\EventListener\RequestListener',
-                    array(
-                        new Reference('sulu_core.webspace.request_analyzer')
-                    )
-                )
-            );
-
-            // add listener to event dispatcher
-            $eventDispatcher = $container->findDefinition('event_dispatcher');
-            $eventDispatcher->addMethodCall(
-                'addListenerService',
-                array(
-                    'kernel.request',
-                    array(
-                        'sulu_core.webspace.request_listener',
-                        'onKernelRequest'
-                    ),
-                    $container->getParameter('sulu_core.webspace.request_analyzer.priority')
-                )
-            );
+        if ($container->getParameter('sulu.context') === SuluKernel::CONTEXT_WEBSITE) {
+            $container->setAlias('sulu_core.webspace.request_analyzer', 'sulu_core.webspace.request_analyzer.website');
+        } else {
+            $container->setAlias('sulu_core.webspace.request_analyzer', 'sulu_core.webspace.request_analyzer.admin');
         }
+
+        // set listener
+        $container->setDefinition(
+            'sulu_core.webspace.request_listener',
+            new Definition(
+                'Sulu\Component\Webspace\EventListener\RequestListener',
+                [
+                    new Reference('sulu_core.webspace.request_analyzer'),
+                ]
+            )
+        );
+
+        // add listener to event dispatcher
+        $eventDispatcher = $container->findDefinition('event_dispatcher');
+        $eventDispatcher->addMethodCall(
+            'addListenerService',
+            [
+                'kernel.request',
+                [
+                    'sulu_core.webspace.request_listener',
+                    'onKernelRequest',
+                ],
+                $container->getParameter('sulu_core.webspace.request_analyzer.priority'),
+            ]
+        );
     }
 }

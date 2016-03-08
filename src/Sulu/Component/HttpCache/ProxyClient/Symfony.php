@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,11 +11,17 @@
 
 namespace Sulu\Component\HttpCache\ProxyClient;
 
-use FOS\HttpCache\Exception\MissingHostException;
-use FOS\HttpCache\ProxyClient\ProxyClientInterface;
+use FOS\HttpCache\Exception\ExceptionCollection;
+use FOS\HttpCache\Exception\InvalidUrlException;
+use FOS\HttpCache\Exception\ProxyResponseException;
+use FOS\HttpCache\Exception\ProxyUnreachableException;
 use FOS\HttpCache\ProxyClient\Invalidation\PurgeInterface;
+use FOS\HttpCache\ProxyClient\ProxyClientInterface;
 use Guzzle\Http\Client;
 use Guzzle\Http\ClientInterface;
+use Guzzle\Http\Exception\CurlException;
+use Guzzle\Http\Exception\MultiTransferException;
+use Guzzle\Http\Exception\RequestException;
 use Guzzle\Http\Message\RequestInterface;
 
 /**
@@ -22,39 +29,38 @@ use Guzzle\Http\Message\RequestInterface;
  */
 class Symfony implements ProxyClientInterface, PurgeInterface
 {
-
     const HTTP_METHOD_PURGE = 'PURGE';
 
     /**
-     * HTTP client
+     * HTTP client.
      *
      * @var ClientInterface
      */
     private $client;
 
     /**
-     * Request queue
+     * Request queue.
      *
      * @var array|RequestInterface[]
      */
     private $queue;
 
     /**
-     * Constructor
+     * Constructor.
      *
-     * @param ClientInterface $client  HTTP client (optional). If no HTTP client
-     *                                 is supplied, a default one will be
-     *                                 created.
+     * @param ClientInterface $client HTTP client (optional). If no HTTP client
+     *                                is supplied, a default one will be
+     *                                created.
      */
     public function __construct(ClientInterface $client = null)
     {
-        $this->client = $client ? : new Client();
+        $this->client = $client ?: new Client();
     }
 
     /**
      * {@inheritdoc}
      */
-    public function purge($url)
+    public function purge($url, array $headers = [])
     {
         $this->queueRequest(self::HTTP_METHOD_PURGE, $url);
 
@@ -71,40 +77,40 @@ class Symfony implements ProxyClientInterface, PurgeInterface
             return 0;
         }
 
-        $this->queue = array();
+        $this->queue = [];
         $this->sendRequests($queue);
 
         return count($queue);
     }
 
     /**
-     * Add a request to the queue
+     * Add a request to the queue.
      *
-     * @param string $method HTTP method
-     * @param string $url URL
-     * @param array $headers HTTP headers
+     * @param string $method  HTTP method
+     * @param string $url     URL
+     * @param array  $headers HTTP headers
      */
-    protected function queueRequest($method, $url, array $headers = array())
+    protected function queueRequest($method, $url, array $headers = [])
     {
         $this->queue[] = $this->createRequest($method, $url, $headers);
     }
 
     /**
-     * Create request
+     * Create request.
      *
-     * @param string $method HTTP method
-     * @param string $url URL
-     * @param array $headers HTTP headers
+     * @param string $method  HTTP method
+     * @param string $url     URL
+     * @param array  $headers HTTP headers
      *
      * @return RequestInterface
      */
-    protected function createRequest($method, $url, array $headers = array())
+    protected function createRequest($method, $url, array $headers = [])
     {
         return $this->client->createRequest($method, $url, $headers);
     }
 
     /**
-     * Sends all requests to each caching proxy server
+     * Sends all requests to each caching proxy server.
      *
      * Requests are sent in parallel to minimise impact on performance.
      *
@@ -114,10 +120,10 @@ class Symfony implements ProxyClientInterface, PurgeInterface
      */
     private function sendRequests(array $requests)
     {
-        $allRequests = array();
+        $allRequests = [];
 
         foreach ($requests as $request) {
-            /** @var RequestInterface $request */
+            /* @var RequestInterface $request */
             $proxyRequest = $this->client->createRequest(
                 $request->getMethod(),
                 $request->getUrl(),
@@ -134,7 +140,7 @@ class Symfony implements ProxyClientInterface, PurgeInterface
     }
 
     /**
-     * Handle request exception
+     * Handle request exception.
      *
      * @param MultiTransferException $exceptions
      *
@@ -172,12 +178,12 @@ class Symfony implements ProxyClientInterface, PurgeInterface
     }
 
     /**
-     * Filter a URL
+     * Filter a URL.
      *
      * Prefix the URL with "http://" if it has no scheme, then check the URL
      * for validity. You can specify what parts of the URL are allowed.
      *
-     * @param string $url
+     * @param string   $url
      * @param string[] $allowedParts Array of allowed URL parts (optional)
      *
      * @throws InvalidUrlException If URL is invalid, the scheme is not http or
@@ -185,7 +191,7 @@ class Symfony implements ProxyClientInterface, PurgeInterface
      *
      * @return string The URL (with default scheme if there was no scheme)
      */
-    protected function filterUrl($url, array $allowedParts = array())
+    protected function filterUrl($url, array $allowedParts = [])
     {
         // parse_url doesn’t work properly when no scheme is supplied, so
         // prefix URL with HTTP scheme if necessary.
@@ -215,7 +221,7 @@ class Symfony implements ProxyClientInterface, PurgeInterface
     }
 
     /**
-     * Get default scheme
+     * Get default scheme.
      *
      * @return string
      */
@@ -229,6 +235,6 @@ class Symfony implements ProxyClientInterface, PurgeInterface
      */
     protected function getAllowedSchemes()
     {
-        return array('http');
+        return ['http'];
     }
 }

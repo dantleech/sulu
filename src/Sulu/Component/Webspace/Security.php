@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -11,19 +12,20 @@
 namespace Sulu\Component\Webspace;
 
 /**
- * Represents the segments defined in a webspace
- * @package Sulu\Component\Portal
+ * Represents the segments defined in a webspace.
  */
 class Security
 {
     /**
-     * The key of the segment
+     * The key of the segment.
+     *
      * @var string
      */
     private $system;
 
     /**
-     * Sets the key of the segment
+     * Sets the key of the segment.
+     *
      * @param string $system
      */
     public function setSystem($system)
@@ -32,7 +34,8 @@ class Security
     }
 
     /**
-     * Returns the key of the segment
+     * Returns the key of the segment.
+     *
      * @return string
      */
     public function getSystem()

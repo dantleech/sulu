@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,14 +11,12 @@
 
 namespace Sulu\Component\Webspace\Loader\Exception;
 
-use Sulu\Component\Webspace\Portal;
 use Sulu\Component\Webspace\Webspace;
 
 class InvalidWebspaceDefaultLocalizationException extends WebspaceException
 {
     /**
      * @param Webspace $webspace
-     * @internal param string $urlPattern
      */
     public function __construct(Webspace $webspace)
     {

@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -11,37 +12,39 @@
 namespace Sulu\Component\Rest\Exception;
 
 /**
- * This exception should be thrown when an Entity is not found
- * @package Sulu\Bundle\CoreBundle\Controller\Exception
+ * This exception should be thrown when an Entity is not found.
  */
 class EntityNotFoundException extends RestException
 {
     /**
-     * The type of the entity, which was not found
+     * The type of the entity, which was not found.
+     *
      * @var string
      */
     protected $entity;
 
     /**
-     * The id of the entity, which was not found
+     * The id of the entity, which was not found.
+     *
      * @var int
      */
     protected $id;
 
     /**
      * @param string $entity The type of the entity, which was not found
-     * @param int $id The id of the entity, which was not found
+     * @param int    $id     The id of the entity, which was not found
      */
-    public function __construct($entity, $id)
+    public function __construct($entity, $id, $previous = null)
     {
         $this->entity = $entity;
         $this->id = $id;
         $message = 'Entity with the type "' . $entity . '" and the id "' . $id . '" not found.';
-        parent::__construct($message, 0);
+        parent::__construct($message, 0, $previous);
     }
 
     /**
-     * Returns the type of the entity, which was not found
+     * Returns the type of the entity, which was not found.
+     *
      * @return string
      */
     public function getEntity()
@@ -50,7 +53,8 @@ class EntityNotFoundException extends RestException
     }
 
     /**
-     * Returns the id of the entity, which was not found
+     * Returns the id of the entity, which was not found.
+     *
      * @return int
      */
     public function getId()

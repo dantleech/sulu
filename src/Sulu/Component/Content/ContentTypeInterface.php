@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -11,9 +12,10 @@
 namespace Sulu\Component\Content;
 
 use PHPCR\NodeInterface;
+use Sulu\Component\Content\Compat\PropertyInterface;
 
 /**
- * Content type definition
+ * Content type definition.
  */
 interface ContentTypeInterface
 {
@@ -22,18 +24,21 @@ interface ContentTypeInterface
 
     /**
      * returns type of ContentType
-     * PRE_SAVE or POST_SAVE
+     * PRE_SAVE or POST_SAVE.
+     *
      * @return int
      */
     public function getType();
 
     /**
-     * reads the value for given property from the node + sets the value of the property
-     * @param NodeInterface $node
+     * Reads the value for given property from the content repository then sets the value of the Sulu property.
+     *
+     * @param NodeInterface     $node
      * @param PropertyInterface $property
-     * @param string $webspaceKey
-     * @param string $languageCode
-     * @param string $segmentKey
+     * @param string            $webspaceKey
+     * @param string            $languageCode
+     * @param string            $segmentKey
+     *
      * @return mixed
      */
     public function read(
@@ -45,12 +50,33 @@ interface ContentTypeInterface
     );
 
     /**
-     * sets the value of the property with the data given
-     * @param mixed $data
+     * Checks availability of a value.
+     *
+     * @param NodeInterface     $node
+     * @param PropertyInterface $property
+     * @param $webspaceKey
+     * @param $languageCode
+     * @param $segmentKey
+     *
+     * @return mixed
+     */
+    public function hasValue(
+        NodeInterface $node,
+        PropertyInterface $property,
+        $webspaceKey,
+        $languageCode,
+        $segmentKey
+    );
+
+    /**
+     * Sets the value of the Sulu property with the given data.
+     *
+     * @param mixed             $data
      * @param PropertyInterface $property
      * @param $webspaceKey
      * @param string $languageCode
      * @param string $segmentKey
+     *
      * @return mixed
      */
     public function readForPreview(
@@ -62,13 +88,15 @@ interface ContentTypeInterface
     );
 
     /**
-     * save the value from given property
-     * @param NodeInterface $node
+     * Save the value from given property.
+     *
+     * @param NodeInterface     $node
      * @param PropertyInterface $property
-     * @param int $userId
-     * @param string $webspaceKey
-     * @param string $languageCode
-     * @param string $segmentKey
+     * @param int               $userId
+     * @param string            $webspaceKey
+     * @param string            $languageCode
+     * @param string            $segmentKey
+     *
      * @return mixed
      */
     public function write(
@@ -81,12 +109,13 @@ interface ContentTypeInterface
     );
 
     /**
-     * remove property from given node
-     * @param NodeInterface $node
+     * Remove the Sulu property from given repository node.
+     *
+     * @param NodeInterface     $node
      * @param PropertyInterface $property
-     * @param string $webspaceKey
-     * @param string $languageCode
-     * @param string $segmentKey
+     * @param string            $webspaceKey
+     * @param string            $languageCode
+     * @param string            $segmentKey
      */
     public function remove(
         NodeInterface $node,
@@ -97,14 +126,53 @@ interface ContentTypeInterface
     );
 
     /**
-     * returns a template to render a form
+     * Returns a template to render a form.
+     *
      * @return string
      */
     public function getTemplate();
 
     /**
-     * returns default parameters
+     * Returns default parameters.
+     *
+     * @param PropertyInterface|null $property
+     *
      * @return array
      */
-    public function getDefaultParams();
+    public function getDefaultParams(PropertyInterface $property = null);
+
+    /**
+     * returns default value of content type.
+     *
+     * @return mixed
+     */
+    public function getDefaultValue();
+
+    /**
+     * Prepare view data (or metadata) for the template.
+     *
+     * @param PropertyInterface $property
+     *
+     * @return array
+     */
+    public function getViewData(PropertyInterface $property);
+
+    /**
+     * Prepare content data for the template.
+     *
+     * @param PropertyInterface $property
+     *
+     * @return array
+     */
+    public function getContentData(PropertyInterface $property);
+
+    /**
+     * Return the UUIDs that are referenced by this content type for
+     * the given PropertyInterface instance.
+     *
+     * @param PropertyInterface $property
+     *
+     * @return array
+     */
+    public function getReferencedUuids(PropertyInterface $property);
 }

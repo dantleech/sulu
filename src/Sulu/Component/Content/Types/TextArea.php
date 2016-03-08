@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -13,13 +14,13 @@ namespace Sulu\Component\Content\Types;
 use Sulu\Component\Content\SimpleContentType;
 
 /**
- * ContentType for TextArea
+ * ContentType for TextArea.
  */
 class TextArea extends SimpleContentType
 {
     private $template;
 
-    function __construct($template)
+    public function __construct($template)
     {
         parent::__construct('TextArea', '');
 
@@ -27,7 +28,8 @@ class TextArea extends SimpleContentType
     }
 
     /**
-     * returns a template to render a form
+     * returns a template to render a form.
+     *
      * @return string
      */
     public function getTemplate()

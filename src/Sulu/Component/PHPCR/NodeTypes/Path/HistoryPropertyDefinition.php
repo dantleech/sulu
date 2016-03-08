@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,13 +11,12 @@
 
 namespace Sulu\Component\PHPCR\NodeTypes\Path;
 
-
 use PHPCR\NodeType\PropertyDefinitionInterface;
 use PHPCR\PropertyType;
 use PHPCR\Version\OnParentVersionAction;
 
-class HistoryPropertyDefinition implements PropertyDefinitionInterface{
-
+class HistoryPropertyDefinition implements PropertyDefinitionInterface
+{
     /**
      * Gets the node type that contains the declaration of this ItemDefinition.
      *
@@ -77,8 +77,8 @@ class HistoryPropertyDefinition implements PropertyDefinitionInterface{
      * PropertyDefinitionTemplate or NodeDefinitionTemplate, then this method
      * will return false.
      *
-     * @return boolean True, if the item is automatically created when its
-     *      parent node is created, else false.
+     * @return bool True, if the item is automatically created when its
+     *              parent node is created, else false.
      *
      * @api
      */
@@ -106,7 +106,7 @@ class HistoryPropertyDefinition implements PropertyDefinitionInterface{
      *
      * An item definition cannot be both residual and mandatory.
      *
-     * @return boolean True, if the item is mandatory, else false.
+     * @return bool True, if the item is mandatory, else false.
      *
      * @api
      */
@@ -133,7 +133,7 @@ class HistoryPropertyDefinition implements PropertyDefinitionInterface{
      * PropertyDefinitionTemplateInterface or NodeDefinitionTemplateInterface,
      * then this method will return OnParentVersionAction::COPY.
      *
-     * @return integer An int constant member of OnParentVersionAction.
+     * @return int An int constant member of OnParentVersionAction.
      *
      * @api
      */
@@ -161,7 +161,8 @@ class HistoryPropertyDefinition implements PropertyDefinitionInterface{
      * PropertyDefinitionTemplateInterface or NodeDefinitionTemplateInterface,
      * then this method will return false.
      *
-     * @return boolean True, if the child item is protected, else false.
+     * @return bool True, if the child item is protected, else false.
+     *
      * @api
      */
     public function isProtected()
@@ -194,7 +195,7 @@ class HistoryPropertyDefinition implements PropertyDefinitionInterface{
      * PropertyDefinition object is actually a newly-created empty
      * PropertyDefinitionTemplate, then this method will return PropertyType::STRING.
      *
-     * @return integer An integer constant member of PropertyType.
+     * @return int An integer constant member of PropertyType.
      *
      * @api
      */
@@ -343,7 +344,7 @@ class HistoryPropertyDefinition implements PropertyDefinitionInterface{
      */
     public function getValueConstraints()
     {
-        return array();
+        return [];
     }
 
     /**
@@ -379,7 +380,7 @@ class HistoryPropertyDefinition implements PropertyDefinitionInterface{
      */
     public function getDefaultValues()
     {
-        return array(false);
+        return [false];
     }
 
     /**
@@ -396,8 +397,8 @@ class HistoryPropertyDefinition implements PropertyDefinitionInterface{
      * PropertyDefinition object is actually a newly-created empty
      * PropertyDefinitionTemplate, then this method will return false.
      *
-     * @return boolean True, if this property may have multiple values, else
-     *      false.
+     * @return bool True, if this property may have multiple values, else
+     *              false.
      *
      * @api
      */
@@ -431,7 +432,7 @@ class HistoryPropertyDefinition implements PropertyDefinitionInterface{
      * Comparison of Values).
      *
      * @return array an array of query operator constants as defined in
-     *      \PHPCR\Query\QueryObjectModelConstantsInterface
+     *               \PHPCR\Query\QueryObjectModelConstantsInterface
      *
      * @see \PHPCR\Query\QueryObjectModelConstantsInterface
      *
@@ -439,7 +440,7 @@ class HistoryPropertyDefinition implements PropertyDefinitionInterface{
      */
     public function getAvailableQueryOperators()
     {
-        return array();
+        return [];
     }
 
     /**
@@ -452,7 +453,7 @@ class HistoryPropertyDefinition implements PropertyDefinitionInterface{
      * This attribute only takes effect if the node type holding the
      * property definition has a queryable setting of true.
      *
-     * @return boolean True, if this property is full-text searchable, else false.
+     * @return bool True, if this property is full-text searchable, else false.
      *
      * @api
      */
@@ -471,7 +472,7 @@ class HistoryPropertyDefinition implements PropertyDefinitionInterface{
      * This attribute only takes effect if the node type holding the
      * property definition has a queryable setting of true.
      *
-     * @return boolean True, if this property is query orderable, else false.
+     * @return bool True, if this property is query orderable, else false.
      *
      * @api
      */

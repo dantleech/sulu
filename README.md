@@ -1,21 +1,25 @@
-sulu
-=================
-[![](https://travis-ci.org/sulu-cmf/sulu.png)](https://travis-ci.org/sulu-cmf/SuluContentBundle)
-[![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/sulu-cmf/sulu/badges/quality-score.png?s=a4e66cebefa4fb6f55f50066d516dc4ab9ba3d86)](https://scrutinizer-ci.com/g/sulu-cmf/sulu/)
+# Sulu
 
-This bundle is part of the [Sulu Content Management Framework](https://github.com/sulu-cmf/sulu-standard) (CMF) and licensed under the [MIT License](https://github.com/sulu-cmf/SuluContentBundle/blob/develop/LICENSE).
+[![](https://travis-ci.org/sulu-io/sulu.png?branch=develop)](https://travis-ci.org/sulu-io/sulu)
+[![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/sulu-io/sulu/badges/quality-score.png?b=develop)](https://scrutinizer-ci.com/g/sulu-io/sulu/?branch=develop)
 
-The SuluContentBundle builds on other sulu-cmf bundles. It provides basic functionalities for sulu-cmf bundles.
+This package contains the main stack for the
+[Sulu Content Management Framework](https://github.com/sulu-io/sulu-standard) (CMF) licensed under the [MIT License](https://github.com/sulu-io/sulu-standard/LICENSE).
+
+**Although Sulu is stable and already used in production it is still under
+heavy development. Therefore we can not guarantee full backwards compatibility
+at the current stage.**
 
 ## Features
 
-* Content-Managing
-* Webspace-Managing
-* Phpcr initialization
-* Configuration Tree
-* Rest-Abstraction
+* Multiple webspaces and portals
+* Hierarchical content management
+* Media management
+* Tags and Categorization
+* Customer Relationship Manager
+* REST API
 
 ## Requirements
 
-* Symfony: 2.3.*
-* See also the require section of [composer.json](https://github.com/sulu-cmf/sulu/blob/develop/composer.json)
+* Symfony: >= 2.6.*
+* See also the require section of [composer.json](https://github.com/sulu-io/sulu/blob/develop/composer.json)

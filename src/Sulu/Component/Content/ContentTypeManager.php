@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,45 +11,79 @@
 
 namespace Sulu\Component\Content;
 
-use Symfony\Component\DependencyInjection\ContainerAware;
+use Symfony\Component\DependencyInjection\ContainerAwareTrait;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
- * manages content types
- * @package Sulu\Component\Content
+ * ContentTypeManager.
+ *
+ * Uses an alias => service ID map to fetch content types from
+ * the dependency injection container.
  */
-class ContentTypeManager extends ContainerAware implements ContentTypeManagerInterface
+class ContentTypeManager implements ContentTypeManagerInterface
 {
+    use ContainerAwareTrait;
 
     /**
-     * @var string The prefix to load the content from
-     * Default value is given in configuration and set to: 'sulu.content.types.'
+     * @var array
      */
-    private $prefix;
+    protected $aliasServiceIdMap = [];
 
     /**
      * @param ContainerInterface $container
-     * @param string $prefix
      */
-    public function __construct(ContainerInterface $container, $prefix)
+    public function __construct(ContainerInterface $container)
     {
         $this->setContainer($container);
-        $this->prefix = $prefix;
+    }
+
+    /**
+     * Map a content type alias to a service ID.
+     *
+     * @param string $alias     - Alias for content type, e.g. media
+     * @param string $serviceId - ID of corresponding service in the DI container
+     */
+    public function mapAliasToServiceId($alias, $serviceId)
+    {
+        $this->aliasServiceIdMap[$alias] = $serviceId;
     }
 
     /**
      * {@inheritdoc}
      */
-    public function get($contentTypeName)
+    public function get($alias)
     {
-        return $this->container->get($this->prefix . $contentTypeName);
+        if (!isset($this->aliasServiceIdMap[$alias])) {
+            throw new \InvalidArgumentException(sprintf(
+                'Content type with alias "%s" has not been registered. Known content types are: "%s"',
+                $alias,
+                implode('", "', array_keys($this->aliasServiceIdMap))
+            ));
+        }
+
+        $serviceId = $this->aliasServiceIdMap[$alias];
+
+        return $this->container->get($serviceId);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function has($contentTypeName)
+    public function has($alias)
     {
-        return $this->container->has($this->prefix . $contentTypeName);
+        return isset($this->aliasServiceIdMap[$alias]);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getAll()
+    {
+        $result = [];
+        foreach ($this->aliasServiceIdMap as $alias => $id) {
+            $result[$alias] = ['instance' => $this->get($alias), 'id' => $id];
+        }
+
+        return $result;
     }
 }

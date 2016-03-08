@@ -1,0 +1,18 @@
+/node_modules/
+/vendor/
+/composer.phar
+/composer.lock
+/.sass-cache/
+
+# IDEs
+.idea/*
+*.iml
+*~
+
+#npm
+npm-debug.log
+
+# build
+Resources/public/bundles/
+Resources/public/index.html.twig
+Resources/public/login.html.twig

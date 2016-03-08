@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,17 +11,16 @@
 
 namespace Sulu\Component\Content\Mapper\Translation;
 
-use Sulu\Component\Content\PropertyInterface;
-use Sulu\Component\Content\PropertyTag;
+use Sulu\Component\Content\Compat\PropertyInterface;
+use Sulu\Component\Content\Compat\PropertyTag;
 
 /**
- * Wrapper for translated properties
- * @package Sulu\Component\Content\Mapper\Translation
+ * Wrapper for translated properties.
  */
 class TranslatedProperty implements PropertyInterface
 {
     /**
-     * @var \Sulu\Component\Content\PropertyInterface
+     * @var \Sulu\Component\Content\Document\Property\PropertyInterface
      */
     private $property;
 
@@ -35,19 +35,27 @@ class TranslatedProperty implements PropertyInterface
     private $languageNamespace;
 
     /**
-     * @param PropertyInterface $property
-     * @param string $localization
-     * @param string $languageNamespace
+     * @var string
      */
-    public function __construct(PropertyInterface $property, $localization, $languageNamespace)
-    {
+    private $additionalPrefix;
+
+    /**
+     * Constructor.
+     */
+    public function __construct(
+        PropertyInterface $property,
+        $localization,
+        $languageNamespace,
+        $additionalPrefix = null
+    ) {
         $this->property = $property;
         $this->localization = $localization;
         $this->languageNamespace = $languageNamespace;
+        $this->additionalPrefix = $additionalPrefix;
     }
 
     /**
-     * @return \Sulu\Component\Content\PropertyInterface
+     * @return \Sulu\Component\Content\Document\Property\PropertyInterface
      */
     public function getProperty()
     {
@@ -55,20 +63,25 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * returns name of template
+     * returns name of template.
+     *
      * @return string
      */
     public function getName()
     {
         if ($this->property->getMultilingual()) {
-            return $this->languageNamespace . ':' . $this->localization . '-' . $this->property->getName();
+            return $this->languageNamespace .
+            ':' . $this->localization .
+            '-' . ($this->additionalPrefix !== null ? $this->additionalPrefix . '-' : '') .
+            $this->property->getName();
         } else {
-            return $this->property->getName();
+            return ($this->additionalPrefix !== null ? $this->additionalPrefix . '-' : '') . $this->property->getName();
         }
     }
 
     /**
-     * returns mandatory
+     * returns mandatory.
+     *
      * @return bool
      */
     public function isMandatory()
@@ -77,7 +90,8 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * returns multilingual
+     * returns multilingual.
+     *
      * @return bool
      */
     public function isMultilingual()
@@ -86,7 +100,8 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * return min occurs
+     * return min occurs.
+     *
      * @return int
      */
     public function getMinOccurs()
@@ -95,7 +110,8 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * return max occurs
+     * return max occurs.
+     *
      * @return int
      */
     public function getMaxOccurs()
@@ -104,7 +120,8 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * returns name of content type
+     * returns name of content type.
+     *
      * @return string
      */
     public function getContentTypeName()
@@ -113,7 +130,8 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * parameter of property
+     * parameter of property.
+     *
      * @return array
      */
     public function getParams()
@@ -122,7 +140,8 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * sets the value from property
+     * sets the value from property.
+     *
      * @param $value mixed
      */
     public function setValue($value)
@@ -131,7 +150,8 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * gets the value from property
+     * gets the value from property.
+     *
      * @return mixed
      */
     public function getValue()
@@ -140,7 +160,8 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * sets the localization of this property
+     * sets the localization of this property.
+     *
      * @param string $localization
      */
     public function setLocalization($localization)
@@ -149,7 +170,8 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * returns the localization of this property
+     * returns the localization of this property.
+     *
      * @return string
      */
     public function getLocalization()
@@ -158,8 +180,9 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * returns TRUE if property is a block
-     * @return boolean
+     * returns TRUE if property is a block.
+     *
+     * @return bool
      */
     public function getIsBlock()
     {
@@ -167,7 +190,8 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * returns TRUE if property is multiple
+     * returns TRUE if property is multiple.
+     *
      * @return bool
      */
     public function getIsMultiple()
@@ -176,8 +200,9 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * returns field is mandatory
-     * @return boolean
+     * returns field is mandatory.
+     *
+     * @return bool
      */
     public function getMandatory()
     {
@@ -185,8 +210,9 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * returns field is multilingual
-     * @return boolean
+     * returns field is multilingual.
+     *
+     * @return bool
      */
     public function getMultilingual()
     {
@@ -194,7 +220,8 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * returns tags defined in xml
+     * returns tags defined in xml.
+     *
      * @return PropertyTag[]
      */
     public function getTags()
@@ -203,8 +230,10 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * returns tag with given name
+     * returns tag with given name.
+     *
      * @param string $tagName
+     *
      * @return PropertyTag
      */
     public function getTag($tagName)
@@ -213,7 +242,8 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * returns column span
+     * returns column span.
+     *
      * @return string
      */
     public function getColspan()
@@ -222,8 +252,10 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * returns title of property
+     * returns title of property.
+     *
      * @param string $languageCode
+     *
      * @return string
      */
     public function getTitle($languageCode)
@@ -232,8 +264,10 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * returns infoText of property
+     * returns infoText of property.
+     *
      * @param string $languageCode
+     *
      * @return string
      */
     public function getInfoText($languageCode)
@@ -242,12 +276,43 @@ class TranslatedProperty implements PropertyInterface
     }
 
     /**
-     * returns placeholder of property
+     * returns placeholder of property.
+     *
      * @param string $languageCode
+     *
      * @return string
      */
     public function getPlaceholder($languageCode)
     {
         return $this->property->getPlaceholder($languageCode);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function toArray($depth = null)
+    {
+        return $this->property->toArray($depth);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getStructure()
+    {
+        return $this->property->getStructure();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setStructure($structure)
+    {
+        $this->property->setStructure($structure);
+    }
+
+    public function getDocument()
+    {
+        return $this->property->getDocument();
     }
 }

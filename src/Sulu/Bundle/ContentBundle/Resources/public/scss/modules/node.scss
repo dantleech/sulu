@@ -1,0 +1,31 @@
+/**
+ * Copy locales
+ */
+
+.copy-locales-overlay-content,
+.copy-locale-overlay-content {
+    margin-left: 20px;
+    margin-right: 20px;
+    margin-bottom: 60px;
+
+    label {
+        display: inline;
+        color: $black;
+    }
+
+    label.disabled {
+        color: $grayLight;
+        cursor: default;
+    }
+
+    .info {
+        font-size: 14px;
+        color: $grayLight;
+    }
+}
+
+#copy-locale-overlay-select {
+    margin-left: 20px;
+    margin-top: 10px;
+    width: 50%;
+}

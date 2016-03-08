@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,23 +11,33 @@
 
 namespace Sulu\Component\Content\Types\Rlp\Strategy;
 
+use Sulu\Component\Content\Compat\StructureManagerInterface;
+use Sulu\Component\Content\ContentTypeManagerInterface;
 use Sulu\Component\Content\Types\Rlp\Mapper\RlpMapperInterface;
 use Sulu\Component\PHPCR\PathCleanupInterface;
+use Sulu\Component\Util\SuluNodeHelper;
 
 /**
- * implements RLP Strategy "whole tree"
+ * implements RLP Strategy "whole tree".
  */
 class TreeStrategy extends RlpStrategy
 {
-    public function __construct(RlpMapperInterface $mapper, PathCleanupInterface $cleaner)
-    {
-        parent::__construct('whole-tree', $mapper, $cleaner);
+    public function __construct(
+        RlpMapperInterface $mapper,
+        PathCleanupInterface $cleaner,
+        StructureManagerInterface $structureManager,
+        ContentTypeManagerInterface $contentTypeManager,
+        SuluNodeHelper $nodeHelper
+    ) {
+        parent::__construct('whole-tree', $mapper, $cleaner, $structureManager, $contentTypeManager, $nodeHelper);
     }
 
     /**
-     * internal generator
+     * internal generator.
+     *
      * @param string $title
      * @param string $parentPath
+     *
      * @return string
      */
     protected function generatePath($title, $parentPath = null)

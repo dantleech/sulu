@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -11,34 +12,16 @@
 namespace Sulu\Component\PHPCR;
 
 /**
- * cleans path strings
+ * cleans path strings.
  */
 class PathCleanup implements PathCleanupInterface
 {
     /**
-     * replacers for cleanup
+     * replacers for cleanup.
+     *
      * @var array
      */
-    protected $replacers = array(
-        'default' => array(
-            ' ' => '-',
-            '+' => '-',
-            'ä' => 'ae',
-            'ö' => 'oe',
-            'ü' => 'ue',
-            // because strtolower ignores Ä,Ö,Ü
-            'Ä' => 'ae',
-            'Ö' => 'oe',
-            'Ü' => 'ue'
-            // TODO should be filled
-        ),
-        'de' => array(
-            '&' => 'und'
-        ),
-        'en' => array(
-            '&' => 'and'
-        )
-    );
+    protected $replacers = [];
 
     /**
      * valid pattern for path
@@ -46,31 +29,48 @@ class PathCleanup implements PathCleanupInterface
      *  + test whole input case insensitive
      *  + trailing slash
      *  + one or more sign (a-z, 0-9, -, _)
-     *  + repeat
+     *  + repeat.
+     *
      * @var string
      */
     private $pattern = '/^(\/[a-z0-9-_]+)+$/i';
 
     /**
-     * returns a clean string
+     * PathCleanup constructor.
+     *
+     * @param array $replacers
+     */
+    public function __construct(array $replacers)
+    {
+        $this->replacers = $replacers;
+    }
+
+    /**
+     * returns a clean string.
+     *
      * @param string $dirty dirty string to cleanup
-     * @param  string $languageCode
+     * @param string $languageCode
+     *
      * @return string clean string
      */
-    public function cleanup($dirty, $languageCode)
+    public function cleanup($dirty, $languageCode = null)
     {
-        $clean = strtolower($dirty);
+        $replacers = $this->replacers['default'];
 
-        $replacers = array_merge(
-            $this->replacers['default'],
-            (isset($this->replacers[$languageCode]) ? $this->replacers[$languageCode] : array())
-        );
+        if ($languageCode !== null) {
+            $replacers = array_merge(
+                $replacers,
+                (isset($this->replacers[$languageCode]) ? $this->replacers[$languageCode] : [])
+            );
+        }
 
         if (count($replacers) > 0) {
             foreach ($replacers as $key => $value) {
-                $clean = str_replace($key, $value, $clean);
+                $dirty = str_replace($key, $value, $dirty);
             }
         }
+
+        $clean = strtolower($dirty);
 
         // Inspired by ZOOLU
         // delete problematic characters
@@ -90,12 +90,14 @@ class PathCleanup implements PathCleanupInterface
     }
 
     /**
-     * returns TRUE if path is valid
+     * returns TRUE if path is valid.
+     *
      * @param string $path
+     *
      * @return bool
      */
     public function validate($path)
     {
-        return preg_match($this->pattern, $path) === 1;
+        return $path === '/' || preg_match($this->pattern, $path) === 1;
     }
-} 
+}

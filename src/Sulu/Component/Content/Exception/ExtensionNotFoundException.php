@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -9,10 +10,6 @@
  */
 
 namespace Sulu\Component\Content\Exception;
-
-use Sulu\Component\Content\ContentTypeInterface;
-use Sulu\Component\Content\PropertyInterface;
-use Sulu\Component\Content\StructureInterface;
 
 class ExtensionNotFoundException extends \Exception
 {
@@ -26,7 +23,7 @@ class ExtensionNotFoundException extends \Exception
      */
     private $name;
 
-    function __construct(StructureInterface $structure, $name)
+    public function __construct(StructureInterface $structure, $name)
     {
         parent::__construct(sprintf('Extension "%s" not found in structure "%s"', $name, get_class($structure)));
         $this->structure = $structure;

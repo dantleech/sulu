@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -12,32 +13,33 @@ namespace Sulu\Component\Rest\Exception;
 
 /**
  * This exception should be thrown when an argument is invalid!
- * @package Sulu\Bundle\CoreBundle\Controller\Exception
  */
 class InvalidArgumentException extends RestException
 {
     /**
-     * The type of the entity, which was concerned
+     * The type of the entity, which was concerned.
+     *
      * @var string
      */
     protected $entity;
 
     /**
-     * The argument of the entity, which was not passed
+     * The argument of the entity, which was not passed.
+     *
      * @var string
      */
     protected $argument;
 
     /**
-     * @param string $entity The type of the entity
-     * @param string $argument The argument of the entity, which was invalid
-     * @param null $customMessage
+     * @param string $entity        The type of the entity
+     * @param string $argument      The argument of the entity, which was invalid
+     * @param null   $customMessage
      */
     public function __construct($entity, $argument, $customMessage = null)
     {
         $this->entity = $entity;
         $this->argument = $argument;
-        $message = 'The "' . $entity . '"-entity requires a valid "' . $argument . '"-argument';
+        $message = 'The "' . $entity . '"-entity requires a valid "' . $argument . '"-argument. ';
         if ($customMessage != null) {
             $message .= $customMessage;
         }
@@ -45,7 +47,8 @@ class InvalidArgumentException extends RestException
     }
 
     /**
-     * Returns the type of the entity, which was concerned
+     * Returns the type of the entity, which was concerned.
+     *
      * @return string
      */
     public function getArgument()
@@ -54,7 +57,8 @@ class InvalidArgumentException extends RestException
     }
 
     /**
-     * Returns the argument of the entity, which was not passed
+     * Returns the argument of the entity, which was not passed.
+     *
      * @return string
      */
     public function getEntity()

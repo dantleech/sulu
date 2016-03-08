@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -16,14 +17,15 @@ use Sulu\Component\Webspace\Webspace;
 class InvalidPortalDefaultLocalizationException extends WebspaceException
 {
     /**
-     * The webspace in which the error occured
+     * The webspace in which the error occured.
+     *
      * @var Webspace
      */
     private $portal;
 
     /**
-     * @param Webspace $portal
-     * @internal param string $urlPattern
+     * @param Webspace $webspace
+     * @param Portal   $portal
      */
     public function __construct(Webspace $webspace, Portal $portal)
     {
@@ -35,7 +37,8 @@ class InvalidPortalDefaultLocalizationException extends WebspaceException
     }
 
     /**
-     * Returns the webspace in which the error occured
+     * Returns the webspace in which the error occured.
+     *
      * @return Webspace
      */
     public function getPortal()

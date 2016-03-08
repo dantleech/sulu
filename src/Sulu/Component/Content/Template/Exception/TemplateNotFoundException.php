@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,27 +11,28 @@
 
 namespace Sulu\Component\Content\Template\Exception;
 
+use Exception;
+
 /**
- * indicates an exception in template loading
+ * indicates an exception in template loading.
  */
-class TemplateNotFoundException extends \Exception
+class TemplateNotFoundException extends Exception
 {
     /**
      * @var string
      */
     private $templateKey;
+
     /**
      * @var string
      */
     private $path;
 
-    function __construct($path, $templateKey)
+    public function __construct($path, $templateKey, $originalException = null)
     {
-        parent::__construct(sprintf('a valid template with key "%s" and file "%s" cannot be found', $templateKey, $path));
+        parent::__construct(sprintf('a valid template with key "%s" and file "%s" cannot be found', $templateKey, $path), null, $originalException);
 
         $this->path = $path;
         $this->templateKey = $templateKey;
     }
-
-
-} 
+}

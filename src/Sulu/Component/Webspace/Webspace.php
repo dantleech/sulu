@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,68 +11,94 @@
 
 namespace Sulu\Component\Webspace;
 
+use Sulu\Component\Localization\Localization;
+use Sulu\Component\Util\ArrayableInterface;
+
 /**
- * Container for a webspace definition
- * @package Sulu\Component\Webspace
+ * Container for a webspace definition.
  */
-class Webspace
+class Webspace implements ArrayableInterface
 {
     /**
-     * The name of the webspace
+     * The name of the webspace.
+     *
      * @var string
      */
     private $name;
 
     /**
-     * The key of the webspace
+     * The key of the webspace.
+     *
      * @var string
      */
     private $key;
 
     /**
-     * The localizations defined for this webspace
+     * The localizations defined for this webspace.
+     *
      * @var Localization[]
      */
     private $localizations;
 
     /**
-     * The default localization defined for this webspace
+     * The default localization defined for this webspace.
+     *
      * @var Localization
      */
     private $defaultLocalization;
 
     /**
-     * The segments defined for this webspace
+     * The x-default localization defined for this webspace.
+     *
+     * @var Localization
+     */
+    private $xDefaultLocalization;
+
+    /**
+     * The segments defined for this webspace.
+     *
      * @var Segment[]
      */
     private $segments;
 
     /**
-     * The default segment defined for this webspace
+     * The default segment defined for this webspace.
+     *
      * @var Segment
      */
     private $defaultSegment;
 
     /**
-     * The theme of the webspace
+     * The theme of the webspace.
+     *
      * @var Theme
      */
     private $theme;
 
     /**
-     * The portals defined for this webspace
+     * The portals defined for this webspace.
+     *
      * @var Portal[]
      */
     private $portals;
 
     /**
-     * The security system for this webspace
+     * The security system for this webspace.
+     *
      * @var Security
      */
     private $security;
 
     /**
-     * Sets the key of the webspace
+     * Navigation for this webspace.
+     *
+     * @var Navigation
+     */
+    private $navigation;
+
+    /**
+     * Sets the key of the webspace.
+     *
      * @param string $key
      */
     public function setKey($key)
@@ -80,7 +107,8 @@ class Webspace
     }
 
     /**
-     * Returns the key of the webspace
+     * Returns the key of the webspace.
+     *
      * @return string
      */
     public function getKey()
@@ -89,7 +117,8 @@ class Webspace
     }
 
     /**
-     * Adds a localization to the webspace
+     * Adds a localization to the webspace.
+     *
      * @param Localization $localization
      */
     public function addLocalization(Localization $localization)
@@ -97,13 +126,18 @@ class Webspace
         $this->localizations[] = $localization;
 
         if ($localization->isDefault()) {
-            $this->defaultLocalization = $localization;
+            $this->setDefaultLocalization($localization);
+        }
+
+        if ($localization->isXDefault()) {
+            $this->xDefaultLocalization = $localization;
         }
     }
 
     /**
-     * Returns the localizations of this webspace
-     * @param \Sulu\Component\Webspace\Localization[] $localizations
+     * Returns the localizations of this webspace.
+     *
+     * @param Localization[] $localizations
      */
     public function setLocalizations($localizations)
     {
@@ -111,8 +145,9 @@ class Webspace
     }
 
     /**
-     * Returns the localizations of this webspace
-     * @return \Sulu\Component\Webspace\Localization[]
+     * Returns the localizations of this webspace.
+     *
+     * @return Localization[]
      */
     public function getLocalizations()
     {
@@ -120,22 +155,26 @@ class Webspace
     }
 
     /**
-     * Returns a list of all localizations and sublocalizations
-     * @return \Sulu\Component\Webspace\Localization[]
+     * Returns a list of all localizations and sublocalizations.
+     *
+     * @return Localization[]
      */
     public function getAllLocalizations()
     {
-        $localizations = array();
+        $localizations = [];
         foreach ($this->getLocalizations() as $child) {
             $localizations[] = $child;
             $localizations = array_merge($localizations, $child->getAllLocalizations());
         }
+
         return $localizations;
     }
 
     /**
-     * Returns the localization object for a given localization string
+     * Returns the localization object for a given localization string.
+     *
      * @param string $localization
+     *
      * @return Localization|null
      */
     public function getLocalization($localization)
@@ -151,29 +190,54 @@ class Webspace
             }
         }
 
-        return null;
+        return;
     }
 
     /**
-     * Sets the default localization for this webspace
+     * Sets the default localization for this webspace.
+     *
      * @param Localization $defaultLocalization
      */
     public function setDefaultLocalization($defaultLocalization)
     {
         $this->defaultLocalization = $defaultLocalization;
+
+        if (!$this->getXDefaultLocalization()) {
+            $this->xDefaultLocalization = $defaultLocalization;
+        }
     }
 
     /**
-     * Returns the default localization for this webspace
+     * Returns the default localization for this webspace.
+     *
      * @return Localization
      */
     public function getDefaultLocalization()
     {
+        if (!$this->defaultLocalization) {
+            return $this->localizations[0];
+        }
+
         return $this->defaultLocalization;
     }
 
     /**
-     * Sets the name of the webspace
+     * Returns the x-default localization for this webspace.
+     *
+     * @return Localization
+     */
+    public function getXDefaultLocalization()
+    {
+        if (!$this->xDefaultLocalization) {
+            return $this->localizations[0];
+        }
+
+        return $this->xDefaultLocalization;
+    }
+
+    /**
+     * Sets the name of the webspace.
+     *
      * @param string $name
      */
     public function setName($name)
@@ -182,7 +246,8 @@ class Webspace
     }
 
     /**
-     * Returns the name of the webspace
+     * Returns the name of the webspace.
+     *
      * @return string
      */
     public function getName()
@@ -191,7 +256,8 @@ class Webspace
     }
 
     /**
-     * Adds a portal to the webspace
+     * Adds a portal to the webspace.
+     *
      * @param Portal $portal
      */
     public function addPortal(Portal $portal)
@@ -200,7 +266,8 @@ class Webspace
     }
 
     /**
-     * Sets the portals of this webspace
+     * Sets the portals of this webspace.
+     *
      * @param \Sulu\Component\Webspace\Portal[] $portals
      */
     public function setPortals($portals)
@@ -209,7 +276,8 @@ class Webspace
     }
 
     /**
-     * Returns the portals of this webspace
+     * Returns the portals of this webspace.
+     *
      * @return \Sulu\Component\Webspace\Portal[]
      */
     public function getPortals()
@@ -218,7 +286,8 @@ class Webspace
     }
 
     /**
-     * Adds a segment to the webspace
+     * Adds a segment to the webspace.
+     *
      * @param Segment $segment
      */
     public function addSegment(Segment $segment)
@@ -231,7 +300,8 @@ class Webspace
     }
 
     /**
-     * Sets the segments of this webspace
+     * Sets the segments of this webspace.
+     *
      * @param \Sulu\Component\Webspace\Segment[] $segments
      */
     public function setSegments($segments)
@@ -240,7 +310,8 @@ class Webspace
     }
 
     /**
-     * Returns the segments of this webspace
+     * Returns the segments of this webspace.
+     *
      * @return \Sulu\Component\Webspace\Segment[]
      */
     public function getSegments()
@@ -249,7 +320,8 @@ class Webspace
     }
 
     /**
-     * Sets the default segment of this webspace
+     * Sets the default segment of this webspace.
+     *
      * @param \Sulu\Component\Webspace\Segment $defaultSegment
      */
     public function setDefaultSegment($defaultSegment)
@@ -258,7 +330,8 @@ class Webspace
     }
 
     /**
-     * Returns the default segment for this webspace
+     * Returns the default segment for this webspace.
+     *
      * @return \Sulu\Component\Webspace\Segment
      */
     public function getDefaultSegment()
@@ -267,7 +340,8 @@ class Webspace
     }
 
     /**
-     * Sets the theme for this portal
+     * Sets the theme for this portal.
+     *
      * @param \Sulu\Component\Webspace\Theme $theme
      */
     public function setTheme(Theme $theme)
@@ -276,7 +350,8 @@ class Webspace
     }
 
     /**
-     * Returns the theme for this portal
+     * Returns the theme for this portal.
+     *
      * @return \Sulu\Component\Webspace\Theme
      */
     public function getTheme()
@@ -285,7 +360,8 @@ class Webspace
     }
 
     /**
-     * Sets the security system
+     * Sets the security system.
+     *
      * @param Security $security
      */
     public function setSecurity($security)
@@ -294,11 +370,78 @@ class Webspace
     }
 
     /**
-     * Returns the security system
+     * Returns the security system.
+     *
      * @return Security
      */
     public function getSecurity()
     {
         return $this->security;
+    }
+
+    /**
+     * @return Navigation
+     */
+    public function getNavigation()
+    {
+        return $this->navigation;
+    }
+
+    /**
+     * @param Navigation $navigation
+     */
+    public function setNavigation($navigation)
+    {
+        $this->navigation = $navigation;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function toArray($depth = null)
+    {
+        $res = [];
+        $res['key'] = $this->getKey();
+        $res['name'] = $this->getName();
+        $res['localizations'] = [];
+
+        foreach ($this->getLocalizations() as $localization) {
+            $res['localizations'][] = $localization->toArray();
+        }
+
+        $thisSecurity = $this->getSecurity();
+        if ($thisSecurity != null) {
+            $res['security']['system'] = $thisSecurity->getSystem();
+        }
+
+        $res['segments'] = [];
+        $segments = $this->getSegments();
+
+        if (!empty($segments)) {
+            foreach ($segments as $segment) {
+                $res['segments'][] = $segment->toArray();
+            }
+        }
+
+        $res['theme'] = $this->getTheme()->toArray();
+
+        $res['portals'] = [];
+
+        foreach ($this->getPortals() as $portal) {
+            $res['portals'][] = $portal->toArray();
+        }
+
+        $res['navigation'] = [];
+        $res['navigation']['contexts'] = [];
+        if ($navigation = $this->getNavigation()) {
+            foreach ($this->getNavigation()->getContexts() as $context) {
+                $res['navigation']['contexts'][] = [
+                    'key' => $context->getKey(),
+                    'metadata' => $context->getMetadata(),
+                ];
+            }
+        }
+
+        return $res;
     }
 }

@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -12,11 +13,9 @@ namespace Sulu\Component\Rest;
 
 use Doctrine\Common\Collections\Collection;
 use Sulu\Component\Rest\ListBuilder\ListRestHelper;
-use Sulu\Component\Rest\ListBuilder\ListRestHelperInterface;
-use Traversable;
 
 /**
- * Defines some common REST functionalities
+ * Defines some common REST functionalities.
  */
 class DoctrineRestHelper extends RestHelper implements RestHelperInterface
 {
@@ -26,7 +25,7 @@ class DoctrineRestHelper extends RestHelper implements RestHelperInterface
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function processSubEntities(
         $entities,
@@ -35,10 +34,9 @@ class DoctrineRestHelper extends RestHelper implements RestHelperInterface
         callable $add = null,
         callable $update = null,
         callable $delete = null
-    )
-    {
-        /** @var Collection $entities */
-        parent::processSubEntities($entities, $requestEntities, $get, $add, $update, $delete);
+    ) {
+        /* @var Collection $entities */
+        $success = parent::processSubEntities($entities, $requestEntities, $get, $add, $update, $delete);
 
         if (count($entities) > 0) {
             $newEntities = $entities->getValues();
@@ -47,5 +45,7 @@ class DoctrineRestHelper extends RestHelper implements RestHelperInterface
                 $entities->add($value);
             }
         }
+
+        return $success;
     }
-} 
+}

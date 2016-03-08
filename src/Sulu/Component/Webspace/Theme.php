@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,23 +11,43 @@
 
 namespace Sulu\Component\Webspace;
 
+use Sulu\Component\Util\ArrayableInterface;
 
-class Theme
+class Theme implements ArrayableInterface
 {
     /**
-     * The key of the theme
+     * The key of the theme.
+     *
      * @var string
      */
     private $key;
 
     /**
-     * A list of excluded templates
+     * A list of exception templates.
+     *
      * @var array
      */
-    private $excludedTemplates;
+    private $errorTemplates;
 
     /**
-     * Sets the key of the theme
+     * Template which is selected by default if no other template is chosen.
+     *
+     * @var string[]
+     */
+    private $defaultTemplates;
+
+    /**
+     * Theme constructor.
+     */
+    public function __construct()
+    {
+        $this->errorTemplates = [];
+        $this->defaultTemplates = [];
+    }
+
+    /**
+     * Sets the key of the theme.
+     *
      * @param string $key The key of the theme
      */
     public function setKey($key)
@@ -35,7 +56,8 @@ class Theme
     }
 
     /**
-     * Returns the key of the theme
+     * Returns the key of the theme.
+     *
      * @return string The key of the theme
      */
     public function getKey()
@@ -44,29 +66,92 @@ class Theme
     }
 
     /**
-     * Adds an exluded template to this theme instance
-     * @param $excludedTemplate string The template to exclude
+     * Add a new error template for given code.
+     *
+     * @param string $code
+     * @param string $template
      */
-    public function addExcludedTemplate($excludedTemplate)
+    public function addErrorTemplate($code, $template)
     {
-        $this->excludedTemplates[] = $excludedTemplate;
+        $this->errorTemplates[$code] = $template;
     }
 
     /**
-     * Sets the excluded templates
-     * @param array $excludedTemplates
+     * Returns a error template for given code.
+     *
+     * @param string $code
+     *
+     * @return string|null
      */
-    public function setExcludedTemplates($excludedTemplates)
+    public function getErrorTemplate($code)
     {
-        $this->excludedTemplates = $excludedTemplates;
+        if (array_key_exists($code, $this->errorTemplates)) {
+            return $this->errorTemplates[$code];
+        }
+
+        if (array_key_exists('default', $this->errorTemplates)) {
+            return $this->errorTemplates['default'];
+        }
+
+        return;
     }
 
     /**
-     * Returns an array of the excluded templates
-     * @return array The excluded templates
+     * Returns a array of error template.
+     *
+     * @return string[]
      */
-    public function getExcludedTemplates()
+    public function getErrorTemplates()
     {
-        return $this->excludedTemplates;
+        return $this->errorTemplates;
+    }
+
+    /**
+     * Add a new default template for given type.
+     *
+     * @param string $type
+     * @param string $template
+     */
+    public function addDefaultTemplate($type, $template)
+    {
+        $this->defaultTemplates[$type] = $template;
+    }
+
+    /**
+     * Returns a error template for given code.
+     *
+     * @param string $type
+     *
+     * @return string|null
+     */
+    public function getDefaultTemplate($type)
+    {
+        if (array_key_exists($type, $this->defaultTemplates)) {
+            return $this->defaultTemplates[$type];
+        }
+
+        return;
+    }
+
+    /**
+     * Returns a array of default template.
+     *
+     * @return string
+     */
+    public function getDefaultTemplates()
+    {
+        return $this->defaultTemplates;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function toArray($depth = null)
+    {
+        return [
+            'key' => $this->getKey(),
+            'defaultTemplates' => $this->getDefaultTemplates(),
+            'errorTemplates' => $this->getErrorTemplates(),
+        ];
     }
 }

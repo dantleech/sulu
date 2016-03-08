@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -15,18 +16,20 @@ use Exception;
 class ResourceLocatorMovedException extends Exception
 {
     /**
-     * new resource locator after move
+     * new resource locator after move.
+     *
      * @var string
      */
     private $newResourceLocator;
 
     /**
-     * uuid of new path node
+     * uuid of new path node.
+     *
      * @var string
      */
     private $newResourceLocatorUuid;
 
-    function __construct($newResourceLocator, $newResourceLocatorUuid)
+    public function __construct($newResourceLocator, $newResourceLocatorUuid)
     {
         $this->newResourceLocator = $newResourceLocator;
         $this->newResourceLocatorUuid = $newResourceLocatorUuid;

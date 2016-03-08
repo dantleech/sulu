@@ -1,0 +1,1 @@
+define(function(){"use strict";return{header:{tabs:{url:"/admin/content-navigations?alias=translate"},toolbar:{template:"default"},title:"translate.package.title"}}});

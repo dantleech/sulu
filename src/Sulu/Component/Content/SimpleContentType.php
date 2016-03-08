@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -11,32 +12,36 @@
 namespace Sulu\Component\Content;
 
 use PHPCR\NodeInterface;
+use Sulu\Component\Content\Compat\PropertyInterface;
 
 /**
- * Simple implementation of ContentTypes
+ * Simple implementation of ContentTypes.
  */
 abstract class SimpleContentType implements ContentTypeInterface
 {
     /**
-     * name of content type
+     * name of content type.
+     *
      * @var string
      */
     private $name;
 
     /**
-     * default value if node does not have the property
+     * default value if node does not have the property.
+     *
      * @var mixed
      */
     private $defaultValue;
 
-    function __construct($name, $defaultValue = null)
+    public function __construct($name, $defaultValue = null)
     {
         $this->name = $name;
         $this->defaultValue = $defaultValue;
     }
 
     /**
-     * Returns the name of the content type
+     * Returns the name of the content type.
+     *
      * @return string
      */
     public function getName()
@@ -70,6 +75,14 @@ abstract class SimpleContentType implements ContentTypeInterface
     /**
      * {@inheritdoc}
      */
+    public function hasValue(NodeInterface $node, PropertyInterface $property, $webspaceKey, $languageCode, $segmentKey)
+    {
+        return $node->hasProperty($property->getName());
+    }
+
+    /**
+     * {@inheritdoc}
+     */
     public function write(
         NodeInterface $node,
         PropertyInterface $property,
@@ -77,8 +90,7 @@ abstract class SimpleContentType implements ContentTypeInterface
         $webspaceKey,
         $languageCode,
         $segmentKey
-    )
-    {
+    ) {
         $value = $property->getValue();
         if ($value != null) {
             $node->setProperty($property->getName(), $value);
@@ -88,12 +100,7 @@ abstract class SimpleContentType implements ContentTypeInterface
     }
 
     /**
-     * remove property from given node
-     * @param NodeInterface $node
-     * @param PropertyInterface $property
-     * @param string $webspaceKey
-     * @param string $languageCode
-     * @param string $segmentKey
+     * {@inheritdoc}
      */
     public function remove(NodeInterface $node, PropertyInterface $property, $webspaceKey, $languageCode, $segmentKey)
     {
@@ -104,9 +111,7 @@ abstract class SimpleContentType implements ContentTypeInterface
     }
 
     /**
-     * returns type of ContentType
-     * PRE_SAVE or POST_SAVE
-     * @return int
+     * {@inheritdoc}
      */
     public function getType()
     {
@@ -114,25 +119,56 @@ abstract class SimpleContentType implements ContentTypeInterface
     }
 
     /**
-     * magic getter for twig templates
+     * magic getter for twig templates.
+     *
      * @param $property string name of property
-     * @return null
      */
     public function __get($property)
     {
         if (method_exists($this, 'get' . ucfirst($property))) {
             return $this->{'get' . ucfirst($property)}();
         } else {
-            return null;
+            return;
         }
     }
 
     /**
-     * returns default parameters
-     * @return array
+     * {@inheritdoc}
      */
-    public function getDefaultParams()
+    public function getDefaultParams(PropertyInterface $property = null)
     {
-        return array();
+        return [];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getDefaultValue()
+    {
+        return $this->defaultValue;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getViewData(PropertyInterface $property)
+    {
+        return [];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getContentData(PropertyInterface $property)
+    {
+        return $property->getValue();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getReferencedUuids(PropertyInterface $property)
+    {
+        return [];
     }
 }

@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -11,22 +12,26 @@
 namespace Sulu\Component\PHPCR;
 
 /**
- * cleans path strings
+ * cleans path strings.
  */
 interface PathCleanupInterface
 {
     /**
-     * returns a clean string
-     * @param string $dirty dirty string to cleanup
-     * @param  string $languageCode
+     * returns a clean string.
+     *
+     * @param string $dirty        dirty string to cleanup
+     * @param string $languageCode
+     *
      * @return string clean string
      */
-    public function cleanup($dirty, $languageCode);
+    public function cleanup($dirty, $languageCode = null);
 
     /**
-     * returns TRUE if path is valid
+     * returns TRUE if path is valid.
+     *
      * @param string $path
+     *
      * @return bool
      */
     public function validate($path);
-} 
+}

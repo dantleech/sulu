@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,33 +11,53 @@
 
 namespace Sulu\Component\Content\Mapper;
 
-use DateTime;
+use Doctrine\Common\Cache\ArrayCache;
+use Doctrine\Common\Cache\Cache;
+use Jackalope\Query\Row;
 use PHPCR\NodeInterface;
 use PHPCR\Query\QueryInterface;
-use PHPCR\SessionInterface;
+use PHPCR\Query\QueryResultInterface;
+use PHPCR\Util\PathHelper;
+use Sulu\Bundle\ContentBundle\Document\HomeDocument;
+use Sulu\Bundle\DocumentManagerBundle\Bridge\PropertyEncoder;
 use Sulu\Component\Content\BreadcrumbItem;
-use Sulu\Component\Content\BreadcrumbItemInterface;
-use Sulu\Component\Content\ContentTypeInterface;
+use Sulu\Component\Content\Compat\Property as LegacyProperty;
+use Sulu\Component\Content\Compat\Structure as LegacyStructure;
+use Sulu\Component\Content\Compat\StructureInterface;
+use Sulu\Component\Content\Compat\StructureManagerInterface;
 use Sulu\Component\Content\ContentTypeManager;
-use Sulu\Component\Content\ContentEvents;
-use Sulu\Component\Content\Event\ContentNodeEvent;
-use Sulu\Component\Content\Exception\MandatoryPropertyException;
-use Sulu\Component\Content\Exception\StateNotFoundException;
+use Sulu\Component\Content\ContentTypeManagerInterface;
+use Sulu\Component\Content\Document\Behavior\ExtensionBehavior;
+use Sulu\Component\Content\Document\Behavior\OrderBehavior;
+use Sulu\Component\Content\Document\Behavior\ResourceSegmentBehavior;
+use Sulu\Component\Content\Document\Behavior\ShadowLocaleBehavior;
+use Sulu\Component\Content\Document\Behavior\StructureBehavior;
+use Sulu\Component\Content\Document\Behavior\WebspaceBehavior;
+use Sulu\Component\Content\Document\Behavior\WorkflowStageBehavior;
+use Sulu\Component\Content\Document\LocalizationState;
+use Sulu\Component\Content\Document\RedirectType;
+use Sulu\Component\Content\Document\WorkflowStage;
+use Sulu\Component\Content\Exception\InvalidOrderPositionException;
 use Sulu\Component\Content\Exception\TranslatedNodeNotFoundException;
-use Sulu\Component\Content\Mapper\LocalizationFinder\LocalizationFinderInterface;
-use Sulu\Component\Content\Mapper\Translation\MultipleTranslatedProperties;
+use Sulu\Component\Content\Extension\ExtensionInterface;
+use Sulu\Component\Content\Extension\ExtensionManagerInterface;
+use Sulu\Component\Content\Form\Exception\InvalidFormException;
+use Sulu\Component\Content\Mapper\Event\ContentNodeEvent;
 use Sulu\Component\Content\Mapper\Translation\TranslatedProperty;
-use Sulu\Component\Content\PropertyInterface;
-use Sulu\Component\Content\Section\SectionPropertyInterface;
-use Sulu\Component\Content\StructureInterface;
-use Sulu\Component\Content\StructureManagerInterface;
-use Sulu\Component\Content\StructureType;
 use Sulu\Component\Content\Types\ResourceLocatorInterface;
-use Sulu\Component\PHPCR\PathCleanupInterface;
+use Sulu\Component\Content\Types\Rlp\Strategy\RlpStrategyInterface;
+use Sulu\Component\DocumentManager\DocumentManager;
+use Sulu\Component\DocumentManager\NamespaceRegistry;
 use Sulu\Component\PHPCR\SessionManager\SessionManagerInterface;
+use Sulu\Component\Webspace\Manager\WebspaceManagerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
-use Symfony\Component\Stopwatch\Stopwatch;
+use Symfony\Component\Form\FormFactoryInterface;
 
+/**
+ * Maps content nodes to phpcr nodes with content types and provides utility function to handle content nodes.
+ *
+ * @deprecated since 1.0-? use the DocumentManager instead.
+ */
 class ContentMapper implements ContentMapperInterface
 {
     /**
@@ -50,6 +71,11 @@ class ContentMapper implements ContentMapperInterface
     private $structureManager;
 
     /**
+     * @var ExtensionManagerInterface
+     */
+    private $extensionManager;
+
+    /**
      * @var SessionManagerInterface
      */
     private $sessionManager;
@@ -60,472 +86,217 @@ class ContentMapper implements ContentMapperInterface
     private $eventDispatcher;
 
     /**
-     * @var LocalizationFinderInterface
+     * @var WebspaceManagerInterface
      */
-    private $localizationFinder;
+    private $webspaceManager;
 
     /**
-     * namespace of translation
-     * @var string
+     * @var Cache
      */
-    private $languageNamespace;
+    private $extensionDataCache;
 
     /**
-     * prefix for internal properties
-     * @var string
+     * @var RlpStrategyInterface
      */
-    private $internalPrefix;
+    private $strategy;
 
     /**
-     * default language of translation
-     * @var string
+     * @Var DocumentManager
      */
-    private $defaultLanguage;
+    private $documentManager;
 
     /**
-     * default template
-     * @var string
+     * @var FormFactoryInterface
      */
-    private $defaultTemplate;
+    private $formFactory;
 
     /**
-     * @var Stopwatch
+     * @var PropertyEncoder
      */
-    private $stopwatch;
+    private $encoder;
 
     /**
-     * @var PathCleanupInterface
+     * @var NamespaceRegistry
      */
-    private $cleaner;
-
-    /**
-     * excepted states
-     * @var array
-     */
-    private $states = array(
-        StructureInterface::STATE_PUBLISHED,
-        StructureInterface::STATE_TEST
-    );
-
-    private $properties;
+    private $namespaceRegistry;
 
     public function __construct(
-        ContentTypeManager $contentTypeManager,
+        DocumentManager $documentManager,
+        WebspaceManagerInterface $webspaceManager,
+        FormFactoryInterface $formFactory,
+        PropertyEncoder $encoder,
         StructureManagerInterface $structureManager,
+        ExtensionManagerInterface $extensionManager,
+        ContentTypeManagerInterface $contentTypeManager,
         SessionManagerInterface $sessionManager,
         EventDispatcherInterface $eventDispatcher,
-        LocalizationFinderInterface $localizationFinder,
-        PathCleanupInterface $cleaner,
-        $defaultLanguage,
-        $defaultTemplate,
-        $languageNamespace,
-        $internalPrefix,
-        $stopwatch = null
+        RlpStrategyInterface $strategy,
+        NamespaceRegistry $namespaceRegistry
     ) {
         $this->contentTypeManager = $contentTypeManager;
         $this->structureManager = $structureManager;
+        $this->extensionManager = $extensionManager;
         $this->sessionManager = $sessionManager;
-        $this->localizationFinder = $localizationFinder;
+        $this->webspaceManager = $webspaceManager;
+        $this->documentManager = $documentManager;
+        $this->formFactory = $formFactory;
+        $this->encoder = $encoder;
+        $this->namespaceRegistry = $namespaceRegistry;
+
+        // deprecated
         $this->eventDispatcher = $eventDispatcher;
-        $this->defaultLanguage = $defaultLanguage;
-        $this->defaultTemplate = $defaultTemplate;
-        $this->languageNamespace = $languageNamespace;
-        $this->internalPrefix = $internalPrefix;
-        $this->cleaner = $cleaner;
+        $this->strategy = $strategy;
+        $this->inspector = $documentManager->getInspector();
+    }
 
-        // optional
-        $this->stopwatch = $stopwatch;
-
-        // properties
-        $this->properties = new MultipleTranslatedProperties(
-            array(
-                'changer',
-                'changed',
-                'created',
-                'creator',
-                'state',
-                'template',
-                'navigation',
-                'published'
-            ),
-            $this->languageNamespace,
-            $this->internalPrefix
+    /**
+     * {@inheritdoc}
+     */
+    public function saveRequest(ContentMapperRequest $request)
+    {
+        return $this->save(
+            $request->getData(),
+            $request->getTemplateKey(),
+            $request->getWebspaceKey(),
+            $request->getLocale(),
+            $request->getUserId(),
+            $request->getPartialUpdate(),
+            $request->getUuid(),
+            $request->getParentUuid(),
+            $request->getState(),
+            $request->getIsShadow(),
+            $request->getShadowBaseLanguage(),
+            $request->getType()
         );
     }
 
     /**
-     * saves the given data in the content storage
-     * @param array $data The data to be saved
-     * @param string $templateKey Name of template
-     * @param string $webspaceKey Key of webspace
-     * @param string $languageCode Save data for given language
-     * @param int $userId The id of the user who saves
-     * @param bool $partialUpdate ignore missing property
-     * @param string $uuid uuid of node if exists
-     * @param string $parentUuid uuid of parent node
-     * @param int $state state of node
-     * @param string $showInNavigation
+     * @deprecated
      *
-     * @throws \Exception
-     * @return StructureInterface
+     * {@inheritdoc}
      */
     public function save(
         $data,
-        $templateKey,
+        $structureType,
         $webspaceKey,
-        $languageCode,
+        $locale,
         $userId,
-        $partialUpdate = true,
+        $partialUpdate = true, // ignore missing property: clearMissing = false
         $uuid = null,
         $parentUuid = null,
         $state = null,
-        $showInNavigation = null
+        $isShadow = null,
+        $shadowBaseLanguage = null,
+        $documentAlias = LegacyStructure::TYPE_PAGE
     ) {
-        // create translated properties
-        $this->properties->setLanguage($languageCode);
+        // map explicit arguments to data
+        $data['parent'] = $parentUuid;
+        $data['workflowStage'] = $state;
+        $data['template'] = $structureType;
 
-        $structure = $this->getStructure($templateKey);
-        $session = $this->getSession();
-
-        if ($parentUuid !== null) {
-            $root = $session->getNodeByIdentifier($parentUuid);
-        } else {
-            $root = $this->getContentNode($webspaceKey);
+        if ($isShadow) {
+            $data['shadowOn'] = true;
         }
 
-        $nodeNameProperty = $structure->getPropertyByTagName('sulu.node.name');
-        $path = $this->cleaner->cleanUp($data[$nodeNameProperty->getName()], $languageCode);
-
-        $dateTime = new \DateTime();
-
-        $translatedNodeNameProperty = new TranslatedProperty(
-            $nodeNameProperty,
-            $languageCode,
-            $this->languageNamespace
-        );
-
-        $newTranslatedNode = function (NodeInterface $node) use ($userId, $dateTime, &$state, &$showInNavigation) {
-            $node->setProperty($this->properties->getName('creator'), $userId);
-            $node->setProperty($this->properties->getName('created'), $dateTime);
-
-            if (!isset($state)) {
-                $state = StructureInterface::STATE_TEST;
-            }
-            if (!isset($showInNavigation)) {
-                $showInNavigation = false;
-            }
-        };
-
-        /** @var NodeInterface $node */
-        if ($uuid === null) {
-            // create a new node
-            $path = $this->getUniquePath($path, $root);
-            $node = $root->addNode($path);
-            $newTranslatedNode($node);
-
-            $node->addMixin('sulu:content');
-        } else {
-            $node = $session->getNodeByIdentifier($uuid);
-            if (!$node->hasProperty($this->properties->getName('template'))) {
-                $newTranslatedNode($node);
-            } else {
-                $hasSameLanguage = ($languageCode == $this->defaultLanguage);
-                $hasSamePath = ($node->getPath() !== $this->getContentNode($webspaceKey)->getPath());
-                $hasDifferentTitle = !$node->hasProperty($translatedNodeNameProperty->getName()) ||
-                    $node->getPropertyValue(
-                        $translatedNodeNameProperty->getName()
-                    ) !== $data[$nodeNameProperty->getName()];
-
-                if ($hasSameLanguage && $hasSamePath && $hasDifferentTitle) {
-                    $path = $this->getUniquePath($path, $node->getParent());
-                    $node->rename($path);
-                    // FIXME refresh session here
-                }
-            }
+        if ($shadowBaseLanguage) {
+            $data['shadowBaseLanguage'] = $shadowBaseLanguage;
         }
-        $node->setProperty($this->properties->getName('template'), $templateKey);
 
-        $node->setProperty($this->properties->getName('changer'), $userId);
-        $node->setProperty($this->properties->getName('changed'), $dateTime);
-
-        // do not state transition for root (contents) node
-        $contentRootNode = $this->getContentNode($webspaceKey);
-        if ($node->getPath() !== $contentRootNode->getPath() && isset($state)) {
-            $this->changeState(
-                $node,
-                $state,
-                $structure,
-                $this->properties->getName('state'),
-                $this->properties->getName('published')
+        if ($uuid) {
+            $document = $this->documentManager->find(
+                $uuid,
+                $locale,
+                ['type' => $documentAlias, 'load_ghost_content' => false]
             );
-        }
-        if (isset($showInNavigation)) {
-            $node->setProperty($this->properties->getName('navigation'), $showInNavigation);
-        }
-
-        $postSave = array();
-
-        // go through every property in the template
-        /** @var PropertyInterface $property */
-        foreach ($structure->getProperties(true) as $property) {
-            // allow null values in data
-            if (isset($data[$property->getName()])) {
-                $type = $this->getContentType($property->getContentTypeName());
-                $value = $data[$property->getName()];
-                $property->setValue($value);
-
-                // add property to post save action
-                if ($type->getType() == ContentTypeInterface::POST_SAVE) {
-                    $postSave[] = array(
-                        'type' => $type,
-                        'property' => $property
-                    );
-                } else {
-                    $type->write(
-                        $node,
-                        new TranslatedProperty($property, $languageCode, $this->languageNamespace),
-                        $userId,
-                        $webspaceKey,
-                        $languageCode,
-                        null
-                    );
-                }
-            } elseif ($property->getMandatory()) {
-                throw new MandatoryPropertyException($templateKey, $property);
-            } elseif (!$partialUpdate) {
-                $type = $this->getContentType($property->getContentTypeName());
-                // if it is not a partial update remove property
-                $type->remove(
-                    $node,
-                    new TranslatedProperty($property, $languageCode, $this->languageNamespace),
-                    $webspaceKey,
-                    $languageCode,
-                    null
-                );
-            }
-            // if it is a partial update ignore property
+        } else {
+            $document = $this->documentManager->create($documentAlias);
         }
 
-        // save node now
-        $session->save();
-
-        // set post save content types properties
-        foreach ($postSave as $post) {
-            try {
-                /** @var ContentTypeInterface $type */
-                $type = $post['type'];
-                /** @var PropertyInterface $property */
-                $property = $post['property'];
-
-                $type->write(
-                    $node,
-                    new TranslatedProperty($property, $languageCode, $this->languageNamespace),
-                    $userId,
-                    $webspaceKey,
-                    $languageCode,
-                    null
-                );
-            } catch (\Exception $ex) {
-                // TODO Introduce a PostSaveException, so that we don't have to catch everything
-                // FIXME message for user or log entry
-                throw $ex;
-            }
-        }
-        $session->save();
-
-        // save data of extensions
-        foreach ($structure->getExtensions() as $extension) {
-            $extension->setLanguageCode($languageCode, $this->languageNamespace, $this->internalPrefix);
-            if (isset($data['extensions']) && isset($data['extensions'][$extension->getName()])) {
-                $extension->save($node, $data['extensions'][$extension->getName()], $webspaceKey, $languageCode);
-            } else {
-                $extension->load($node, $webspaceKey, $languageCode);
-            }
+        if (!$document instanceof StructureBehavior) {
+            throw new \RuntimeException(sprintf(
+                'The content mapper can only be used to save documents implementing the StructureBehavior interface, got: "%s"',
+                get_class($document)
+            ));
         }
 
-        $session->save();
+        // We eventually handle this from the controller, in which case we will not
+        // have to deal with not knowing what sort of form we will have.
+        if ($document instanceof WebspaceBehavior) {
+            $options['webspace_key'] = $webspaceKey;
+        }
 
-        $structure->setUuid($node->getPropertyValue('jcr:uuid'));
-        $structure->setPath(str_replace($this->getContentNode($webspaceKey)->getPath(), '', $node->getPath()));
-        $structure->setWebspaceKey($webspaceKey);
-        $structure->setLanguageCode($languageCode);
-        $structure->setCreator($node->getPropertyValue($this->properties->getName('creator')));
-        $structure->setChanger($node->getPropertyValue($this->properties->getName('changer')));
-        $structure->setCreated($node->getPropertyValue($this->properties->getName('created')));
-        $structure->setChanged($node->getPropertyValue($this->properties->getName('changed')));
+        // disable csrf protection, since we can't produce a token, because the form is cached on the client
+        $options['csrf_protection'] = false;
 
-        $structure->setNavigation(
-            $node->getPropertyValueWithDefault($this->properties->getName('navigation'), false)
-        );
-        $structure->setGlobalState(
-            $this->getInheritedState($node, $this->properties->getName('state'), $webspaceKey)
-        );
-        $structure->setPublished(
-            $node->getPropertyValueWithDefault($this->properties->getName('published'), null)
-        );
+        $form = $this->formFactory->create($documentAlias, $document, $options);
 
-        // throw an content.node.save event
-        $event = new ContentNodeEvent($node, $structure);
-        $this->eventDispatcher->dispatch(ContentEvents::NODE_SAVE, $event);
+        $clearMissingContent = false;
+        $form->submit($data, $clearMissingContent);
 
-        return $structure;
+        if (!$form->isValid()) {
+            throw new InvalidFormException($form);
+        }
+
+        $this->documentManager->persist($document, $locale, [
+            'user' => $userId,
+            'clear_missing_content' => !$partialUpdate,
+        ]);
+
+        $this->documentManager->flush();
+
+        return $this->documentToStructure($document);
     }
 
     /**
-     * save a extension with given name and data to an existing node
-     * @param string $uuid
-     * @param array $data
-     * @param string $extensionName
-     * @param string $webspaceKey
-     * @param string $languageCode
-     * @param integer $userId
-     * @throws \Sulu\Component\Content\Exception\TranslatedNodeNotFoundException
-     * @return StructureInterface
+     * TODO: Refactor this .. this should be handled in a listener or in the form, or something
+     * {@inheritdoc}
      */
     public function saveExtension(
         $uuid,
         $data,
         $extensionName,
         $webspaceKey,
-        $languageCode,
+        $locale,
         $userId
     ) {
-        // create translated properties
-        $this->properties->setLanguage($languageCode);
+        $document = $this->loadDocument(
+            $uuid,
+            $locale,
+            [
+                'exclude_ghost' => true,
+            ]
+        );
 
-        // get node from session
-        $session = $this->getSession();
-        $node = $session->getNodeByIdentifier($uuid);
-
-        // load rest of node
-        $structure = $this->loadByNode($node, $languageCode, $webspaceKey, true, true);
-
-        if ($structure === null) {
-            throw new TranslatedNodeNotFoundException($uuid, $languageCode);
+        if ($document === null) {
+            throw new TranslatedNodeNotFoundException($uuid, $locale);
         }
 
-        // check if extension exists
-        $structure->getExtension($extensionName);
-
-        // set changer / changed
-        $dateTime = new \DateTime();
-        $node->setProperty($this->properties->getName('changer'), $userId);
-        $node->setProperty($this->properties->getName('changed'), $dateTime);
+        if (!$document instanceof ExtensionBehavior) {
+            throw new \RuntimeException(sprintf(
+                'Document of class "%s" must implement the ExtensionableBehavior if it is to be extended',
+                get_class($document)
+            ));
+        }
 
         // save data of extensions
-        $structure->getExtension($extensionName)->save($node, $data, $webspaceKey, $languageCode);
-        $session->save();
+        $extension = $this->extensionManager->getExtension($document->getStructureType(), $extensionName);
+        $node = $this->inspector->getNode($document);
 
-        // throw an content.node.save event
+        $extension->save($node, $data, $webspaceKey, $locale);
+        $extensionData = $extension->load($node, $webspaceKey, $locale);
+
+        $document->setExtension($extension->getName(), $extensionData);
+
+        $this->documentManager->flush();
+
+        $structure = $this->documentToStructure($document);
+
         $event = new ContentNodeEvent($node, $structure);
-        $this->eventDispatcher->dispatch(ContentEvents::NODE_SAVE, $event);
+        $this->eventDispatcher->dispatch(ContentEvents::NODE_POST_SAVE, $event);
 
         return $structure;
     }
 
-    /**
-     * change state of given node
-     * @param NodeInterface $node node to change state
-     * @param int $state new state
-     * @param \Sulu\Component\Content\StructureInterface $structure
-     * @param string $statePropertyName
-     * @param string $publishedPropertyName
-     *
-     * @throws \Sulu\Component\Content\Exception\StateTransitionException
-     * @throws \Sulu\Component\Content\Exception\StateNotFoundException
-     */
-    private function changeState(
-        NodeInterface $node,
-        $state,
-        StructureInterface $structure,
-        $statePropertyName,
-        $publishedPropertyName
-    ) {
-        if (!in_array($state, $this->states)) {
-            throw new StateNotFoundException($state);
-        }
-
-        // no state (new node) set state
-        if (!$node->hasProperty($statePropertyName)) {
-            $node->setProperty($statePropertyName, $state);
-            $structure->setNodeState($state);
-
-            // published => set only once
-            if ($state === StructureInterface::STATE_PUBLISHED && !$node->hasProperty($publishedPropertyName)) {
-                $node->setProperty($publishedPropertyName, new DateTime());
-            }
-        } else {
-            $oldState = $node->getPropertyValue($statePropertyName);
-
-            if ($oldState === $state) {
-                // do nothing
-                return;
-            } elseif (
-                // from test to published
-                $oldState === StructureInterface::STATE_TEST &&
-                $state === StructureInterface::STATE_PUBLISHED
-            ) {
-                $node->setProperty($statePropertyName, $state);
-                $structure->setNodeState($state);
-
-                // set only once
-                if (!$node->hasProperty($publishedPropertyName)) {
-                    $node->setProperty($publishedPropertyName, new DateTime());
-                }
-            } elseif (
-                // from published to test
-                $oldState === StructureInterface::STATE_PUBLISHED &&
-                $state === StructureInterface::STATE_TEST
-            ) {
-                $node->setProperty($statePropertyName, $state);
-                $structure->setNodeState($state);
-
-                // set published date to null
-                $node->getProperty($publishedPropertyName)->remove();
-            }
-        }
-    }
-
-    /**
-     * saves the given data in the content storage
-     * @param array $data The data to be saved
-     * @param string $templateKey Name of template
-     * @param string $webspaceKey Key of webspace
-     * @param string $languageCode Save data for given language
-     * @param int $userId The id of the user who saves
-     * @param bool $partialUpdate ignore missing property
-     *
-     * @throws \PHPCR\ItemExistsException if new title already exists
-     *
-     * @return StructureInterface
-     */
-    public function saveStartPage(
-        $data,
-        $templateKey,
-        $webspaceKey,
-        $languageCode,
-        $userId,
-        $partialUpdate = true
-    ) {
-        $uuid = $this->getContentNode($webspaceKey)->getIdentifier();
-
-        return $this->save(
-            $data,
-            $templateKey,
-            $webspaceKey,
-            $languageCode,
-            $userId,
-            $partialUpdate,
-            $uuid,
-            null,
-            StructureInterface::STATE_PUBLISHED,
-            true
-        );
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     public function loadByParent(
         $uuid,
         $webspaceKey,
@@ -535,582 +306,543 @@ class ContentMapper implements ContentMapperInterface
         $ignoreExceptions = false,
         $excludeGhosts = false
     ) {
-        if ($uuid != null) {
-            $root = $this->getSession()->getNodeByIdentifier($uuid);
-        } else {
-            $root = $this->getContentNode($webspaceKey);
+        $parent = null;
+        $options = ['load_ghost_content' => true];
+        if ($uuid) {
+            $parent = $this->documentManager->find($uuid, $languageCode, $options);
         }
 
-        return $this->loadByParentNode(
-            $root,
-            $webspaceKey,
-            $languageCode,
-            $depth,
-            $flat,
-            $ignoreExceptions,
-            $excludeGhosts
-        );
-    }
-
-    /**
-     * returns a list of data from children of given node
-     * @param NodeInterface $parent
-     * @param $webspaceKey
-     * @param $languageCode
-     * @param int $depth
-     * @param bool $flat
-     * @param bool $ignoreExceptions
-     * @param bool $excludeGhosts If true ghost pages are also loaded
-     * @throws \Exception
-     * @return array
-     */
-    private function loadByParentNode(
-        NodeInterface $parent,
-        $webspaceKey,
-        $languageCode,
-        $depth = 1,
-        $flat = true,
-        $ignoreExceptions = false,
-        $excludeGhosts
-    ) {
-        if ($this->stopwatch) {
-            $this->stopwatch->start('contentManager.loadByParentNode');
+        if (null === $parent) {
+            $parent = $this->getContentDocument($webspaceKey, $languageCode, $options);
         }
 
-        $results = array();
-        $nodes = $parent->getNodes();
+        $fetchDepth = -1;
 
-        if ($this->stopwatch) {
-            $this->stopwatch->lap('contentManager.loadByParentNode');
+        if (false === $flat) {
+            $fetchDepth = $depth;
         }
 
-        /** @var NodeInterface $node */
-        foreach ($nodes as $node) {
-            try {
-                $result = $this->loadByNode($node, $languageCode, $webspaceKey, $excludeGhosts, true);
+        $children = $this->inspector->getChildren($parent, $options);
+        $children = $this->documentsToStructureCollection($children->toArray(), [
+            'exclude_ghost' => $excludeGhosts,
+        ]);
 
-                if ($result) {
-                    $results[] = $result;
-                }
-
+        if ($flat) {
+            foreach ($children as $child) {
                 if ($depth === null || $depth > 1) {
-                    $children = $this->loadByParentNode(
-                        $node,
+                    $childChildren = $this->loadByParent(
+                        $child->getUuid(),
                         $webspaceKey,
                         $languageCode,
-                        $depth !== null ? $depth - 1 : null,
+                        $depth - 1,
                         $flat,
                         $ignoreExceptions,
                         $excludeGhosts
                     );
-                    if ($flat) {
-                        $results = array_merge($results, $children);
-                    } elseif ($result !== null) {
-                        $result->setChildren($children);
-                    }
-                }
-            } catch (\Exception $ex) {
-                if (!$ignoreExceptions) {
-                    throw $ex;
+                    $children = array_merge($children, $childChildren);
                 }
             }
         }
 
-        if ($this->stopwatch) {
-            $this->stopwatch->stop('contentManager.loadByParentNode');
-        }
-
-        return $results;
+        return $children;
     }
 
     /**
-     * returns the data from the given id
-     * @param string $uuid UUID of the content
-     * @param string $webspaceKey Key of webspace
-     * @param string $languageCode Read data for given language
-     * @param bool $loadGhostContent True if also a ghost page should be returned, otherwise false
-     * @return StructureInterface
+     * {@inheritdoc}
      */
-    public function load($uuid, $webspaceKey, $languageCode, $loadGhostContent = false)
+    public function load($uuid, $webspaceKey, $locale, $loadGhostContent = false)
     {
-        if ($this->stopwatch) {
-            $this->stopwatch->start('contentManager.load');
-        }
-        $session = $this->getSession();
-        $contentNode = $session->getNodeByIdentifier($uuid);
+        $document = $this->documentManager->find($uuid, $locale, [
+            'load_ghost_content' => $loadGhostContent,
+        ]);
 
-        $result = $this->loadByNode($contentNode, $languageCode, $webspaceKey, false, $loadGhostContent);
-
-        if ($this->stopwatch) {
-            $this->stopwatch->stop('contentManager.load');
-        }
-
-        return $result;
+        return $this->documentToStructure($document);
     }
 
     /**
-     * returns the data from the given id
-     * @param string $webspaceKey Key of webspace
-     * @param string $languageCode Read data for given language
-     * @return StructureInterface
+     * {@inheritdoc}
      */
-    public function loadStartPage($webspaceKey, $languageCode)
+    public function loadStartPage($webspaceKey, $locale)
     {
-        $uuid = $this->getContentNode($webspaceKey)->getIdentifier();
+        $startPage = $this->getContentDocument($webspaceKey, $locale);
+        $startPage->setWorkflowStage(WorkflowStage::PUBLISHED);
+        $startPage->setNavigationContexts([]);
 
-        $startPage = $this->load($uuid, $webspaceKey, $languageCode);
-        $startPage->setNodeState(StructureInterface::STATE_PUBLISHED);
-        $startPage->setGlobalState(StructureInterface::STATE_PUBLISHED);
-        $startPage->setNavigation(true);
-
-        return $startPage;
+        return $this->documentToStructure($startPage);
     }
 
     /**
-     * returns data from given path
-     * @param string $resourceLocator Resource locator
-     * @param string $webspaceKey Key of webspace
-     * @param string $languageCode
-     * @param string $segmentKey
-     * @return StructureInterface
+     * {@inheritdoc}
      */
-    public function loadByResourceLocator($resourceLocator, $webspaceKey, $languageCode, $segmentKey = null)
+    public function loadByResourceLocator($resourceLocator, $webspaceKey, $locale, $segmentKey = null)
     {
-        $session = $this->getSession();
         $uuid = $this->getResourceLocator()->loadContentNodeUuid(
             $resourceLocator,
             $webspaceKey,
-            $languageCode,
+            $locale,
             $segmentKey
         );
-        $contentNode = $session->getNodeByIdentifier($uuid);
 
-        return $this->loadByNode($contentNode, $languageCode, $webspaceKey);
+        $document = $this->loadDocument($uuid, $locale, [
+            'exclude_shadow' => false,
+        ]);
+
+        return $this->documentToStructure($document);
     }
 
     /**
-     * returns the content returned by the given sql2 query as structures
-     * @param string $sql2 The query, which returns the content
-     * @param string $languageCode The language code
-     * @param string $webspaceKey The webspace key
-     * @param int $limit Limits the number of returned rows
-     * @return StructureInterface[]
+     * {@inheritdoc}
      */
-    public function loadBySql2($sql2, $languageCode, $webspaceKey, $limit = null)
+    public function loadBySql2($sql2, $locale, $webspaceKey, $limit = null)
     {
-        $structures = array();
+        $query = $this->documentManager->createQuery($sql2, $locale);
+        $query->setMaxResults($limit);
 
-        $query = $this->createSql2Query($sql2, $limit);
-        $result = $query->execute();
+        $documents = $query->execute();
 
-        foreach ($result->getNodes() as $node) {
-            $structures[] = $this->loadByNode($node, $languageCode, $webspaceKey);
-        }
-
-        return $structures;
+        return $this->documentsToStructureCollection($documents, null);
     }
 
     /**
-     * load tree from root to given path
-     * @param string $uuid
-     * @param string $languageCode
-     * @param string $webspaceKey
-     * @param bool $excludeGhost
-     * @param bool $loadGhostContent
-     * @return StructureInterface[]
+     * {@inheritdoc}
      */
-    public function loadTreeByUuid(
+    public function loadByQuery(
+        QueryInterface $query,
+        $locale,
+        $webspaceKey = null,
+        $excludeGhost = true,
+        $loadGhostContent = false
+    ) {
+        $options = [
+            'exclude_ghost' => $excludeGhost,
+            'load_ghost_content' => $loadGhostContent,
+        ];
+
+        $documents = $this->documentManager->createQuery($query, $locale, $options)->execute();
+
+        return $this->documentsToStructureCollection($documents, $options);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function loadNodeAndAncestors(
         $uuid,
-        $languageCode,
-        $webspaceKey,
+        $locale,
+        $webspaceKey = null,
         $excludeGhost = true,
-        $loadGhostContent = false
+        $excludeShadow = true
     ) {
-        $node = $this->getSession()->getNodeByIdentifier($uuid);
+        $document = $this->loadDocument(
+            $uuid,
+            $locale,
+            $options = [
+                'load_ghost_content' => true,
+                'exclude_ghost' => $excludeGhost,
+                'exclude_shadow' => $excludeShadow,
+            ],
+            false
+        );
 
-        if ($this->stopwatch) {
-            $this->stopwatch->start('contentManager.loadTreeByUuid');
+        if (null === $document) {
+            return [];
         }
 
-        list($result) = $this->loadTreeByNode($node, $languageCode, $webspaceKey, $excludeGhost, $loadGhostContent);
-
-        if ($this->stopwatch) {
-            $this->stopwatch->stop('contentManager.loadTreeByUuid');
+        $documents = [];
+        if (!$this->optionsShouldExcludeDocument($document, $options)) {
+            $documents[] = $document;
         }
 
-        return $result;
-    }
-
-    /**
-     * load tree from root to given path
-     * @param string $path
-     * @param string $languageCode
-     * @param string $webspaceKey
-     * @param bool $excludeGhost
-     * @param bool $loadGhostContent
-     * @return StructureInterface[]
-     */
-    public function loadTreeByPath(
-        $path,
-        $languageCode,
-        $webspaceKey,
-        $excludeGhost = true,
-        $loadGhostContent = false
-    ) {
-        $path = ltrim($path, '/');
-        if ($path === '') {
-            $node = $this->getContentNode($webspaceKey);
-        } else {
-            $node = $this->getContentNode($webspaceKey)->getNode($path);
+        if ($document instanceof HomeDocument) {
+            return $this->documentsToStructureCollection($documents, $options);
         }
 
-        if ($this->stopwatch) {
-            $this->stopwatch->start('contentManager.loadTreeByPath');
-        }
-
-        list($result) = $this->loadTreeByNode($node, $languageCode, $webspaceKey, $excludeGhost, $loadGhostContent);
-
-        if ($this->stopwatch) {
-            $this->stopwatch->stop('contentManager.loadTreeByPath');
-        }
-
-        return $result;
-    }
-
-    /**
-     * returns a tree of nodes with the given endpoint
-     * @param NodeInterface $node
-     * @param string $languageCode
-     * @param string $webspaceKey
-     * @param bool $excludeGhost
-     * @param bool $loadGhostContent
-     * @param NodeInterface $childNode
-     * @return StructureInterface[]
-     */
-    private function loadTreeByNode(
-        NodeInterface $node,
-        $languageCode,
-        $webspaceKey,
-        $excludeGhost = true,
-        $loadGhostContent = false,
-        NodeInterface $childNode = null
-    ) {
-        // go up to content node
-        if ($node->getDepth() > $this->getContentNode($webspaceKey)->getDepth()) {
-            list($globalResult, $nodeStructure) = $this->loadTreeByNode(
-                $node->getParent(),
-                $languageCode,
-                $webspaceKey,
-                $excludeGhost,
-                $loadGhostContent,
-                $node
-            );
-        }
-
-        // load children of node
-        $result = array();
-        $childStructure = null;
-        foreach ($node as $child) {
-            $structure = $this->loadByNode($child, $languageCode, $webspaceKey, $excludeGhost, $loadGhostContent);
-            $result[] = $structure;
-            // search structure for child node
-            if ($childNode !== null && $childNode === $child) {
-                $childStructure = $structure;
+        while ($document) {
+            $parentDocument = $this->inspector->getParent($document);
+            $documents[] = $parentDocument;
+            if ($parentDocument instanceof HomeDocument) {
+                return $this->documentsToStructureCollection($documents, $options);
             }
+            $document = $parentDocument;
         }
 
-        // set global result once
-        if (!isset($globalResult)) {
-            $globalResult = $result;
-        }
-        // set children of structure
-        if (isset($nodeStructure)) {
-            $nodeStructure->setChildren($result);
-        }
-
-        return array($globalResult, $childStructure);
+        throw new \RuntimeException(sprintf(
+            'Did not traverse an instance of HomeDocument when searching for desendants of document "%s"',
+            $uuid
+        ));
     }
 
     /**
-     * returns a sql2 query
-     * @param string $sql2 The query, which returns the content
-     * @param int $limit Limits the number of returned rows
-     * @return QueryInterface
-     */
-    private function createSql2Query($sql2, $limit = null)
-    {
-        $queryManager = $this->getSession()->getWorkspace()->getQueryManager();
-        $query = $queryManager->createQuery($sql2, 'JCR-SQL2');
-        if ($limit) {
-            $query->setLimit($limit);
-        }
-
-        return $query;
-    }
-
-    /**
-     * returns data from given node
-     * @param NodeInterface $contentNode
-     * @param string $localization
-     * @param string $webspaceKey
-     * @param bool $excludeGhost True if also a ghost page should be returned, otherwise false
-     * @param bool $loadGhostContent True if also ghost content should be returned, otherwise false
+     * Load/hydrate a shalow structure with the given node.
+     * Shallow structures do not have content properties / extensions
+     * hydrated.
+     *
+     * @param NodeInterface $node
+     * @param string        $localization
+     * @param string        $webspaceKey
+     *
      * @return StructureInterface
      */
-    private function loadByNode(
-        NodeInterface $contentNode,
-        $localization,
-        $webspaceKey,
-        $excludeGhost = true,
-        $loadGhostContent = false
-    ) {
-        if ($this->stopwatch) {
-            $this->stopwatch->start('contentManager.loadByNode');
-        }
-        if ($loadGhostContent) {
-            $availableLocalization = $this->localizationFinder->getAvailableLocalization(
-                $contentNode,
-                $localization,
-                $webspaceKey
-            );
-        } else {
-            $availableLocalization = $localization;
-        }
-
-        if ($excludeGhost && $availableLocalization != $localization) {
-            return null;
-        }
-
-        // create translated properties
-        $this->properties->setLanguage($availableLocalization);
-
-        $templateKey = $contentNode->getPropertyValueWithDefault(
-            $this->properties->getName('template'),
-            $this->defaultTemplate
-        );
-
-        $structure = $this->getStructure($templateKey);
-
-        // set structure to ghost, if the available localization does not match the requested one
-        if ($availableLocalization != $localization) {
-            $structure->setType(StructureType::getGhost($availableLocalization));
-        }
-
-        $structure->setHasTranslation($contentNode->hasProperty($this->properties->getName('template')));
-
-        $structure->setUuid($contentNode->getPropertyValue('jcr:uuid'));
-        $structure->setPath(str_replace($this->getContentNode($webspaceKey)->getPath(), '', $contentNode->getPath()));
-        $structure->setWebspaceKey($webspaceKey);
-        $structure->setLanguageCode($localization);
-        $structure->setCreator($contentNode->getPropertyValueWithDefault($this->properties->getName('creator'), 0));
-        $structure->setChanger($contentNode->getPropertyValueWithDefault($this->properties->getName('changer'), 0));
-        $structure->setCreated(
-            $contentNode->getPropertyValueWithDefault($this->properties->getName('created'), new \DateTime())
-        );
-        $structure->setChanged(
-            $contentNode->getPropertyValueWithDefault($this->properties->getName('changed'), new \DateTime())
-        );
-        $structure->setHasChildren($contentNode->hasNodes());
-
-        $structure->setNodeState(
-            $contentNode->getPropertyValueWithDefault(
-                $this->properties->getName('state'),
-                StructureInterface::STATE_TEST
-            )
-        );
-        $structure->setNavigation(
-            $contentNode->getPropertyValueWithDefault($this->properties->getName('navigation'), false)
-        );
-        $structure->setGlobalState(
-            $this->getInheritedState($contentNode, $this->properties->getName('state'), $webspaceKey)
-        );
-        $structure->setPublished(
-            $contentNode->getPropertyValueWithDefault($this->properties->getName('published'), null)
-        );
-
-        // go through every property in the template
-        /** @var PropertyInterface $property */
-        foreach ($structure->getProperties(true) as $property) {
-            if (!($property instanceof SectionPropertyInterface)) {
-                $type = $this->getContentType($property->getContentTypeName());
-                $type->read(
-                    $contentNode,
-                    new TranslatedProperty(
-                        $property,
-                        $availableLocalization,
-                        $this->languageNamespace
-                    ),
-                    $webspaceKey,
-                    $availableLocalization,
-                    null
-                );
-            }
-        }
-
-        // save data of extensions
-        foreach ($structure->getExtensions() as $extension) {
-            $extension->setLanguageCode($localization, $this->languageNamespace, $this->internalPrefix);
-            $extension->load($contentNode, $webspaceKey, $availableLocalization);
-        }
-
-        // throw an content.node.load event (disabled for now)
-        //$event = new ContentNodeEvent($contentNode, $structure);
-        //$this->eventDispatcher->dispatch(ContentEvents::NODE_LOAD, $event);
-
-        if ($this->stopwatch) {
-            $this->stopwatch->stop('contentManager.loadByNode');
-        }
-
-        return $structure;
-    }
-
-    /**
-     * load breadcrumb for given uuid in given language
-     * @param $uuid
-     * @param $languageCode
-     * @param $webspaceKey
-     * @return BreadcrumbItemInterface[]
-     */
-    public function loadBreadcrumb($uuid, $languageCode, $webspaceKey)
+    public function loadShallowStructureByNode(NodeInterface $contentNode, $localization, $webspaceKey)
     {
-        $this->properties->setLanguage($languageCode);
+        $document = $this->documentManager->find($contentNode->getPath(), $localization);
 
-        $sql = 'SELECT *
-                FROM  [sulu:content] as parent INNER JOIN [sulu:content] as child
-                    ON ISDESCENDANTNODE(child, parent)
-                WHERE child.[jcr:uuid]="' . $uuid . '"';
-
-        $query = $this->createSql2Query($sql);
-        $nodes = $query->execute();
-
-        $result = array();
-        $groundDepth = $this->getContentNode($webspaceKey)->getDepth();
-
-        /** @var NodeInterface $node */
-        foreach ($nodes->getNodes() as $node) {
-            // uuid
-            $nodeUuid = $node->getIdentifier();
-            // depth
-            $depth = $node->getDepth() - $groundDepth;
-            // title
-            $templateKey = $node->getPropertyValueWithDefault(
-                $this->properties->getName('template'),
-                $this->defaultTemplate
-            );
-            $structure = $this->getStructure($templateKey);
-            $nodeNameProperty = $structure->getPropertyByTagName('sulu.node.name');
-            $property = $structure->getProperty($nodeNameProperty->getName());
-            $type = $this->getContentType($property->getContentTypeName());
-            $type->read(
-                $node,
-                new TranslatedProperty($property, $languageCode, $this->languageNamespace),
-                $webspaceKey,
-                $languageCode,
-                null
-            );
-            $nodeName = $property->getValue();
-            $structure->setUuid($node->getPropertyValue('jcr:uuid'));
-            $structure->setPath(str_replace($this->getContentNode($webspaceKey)->getPath(), '', $node->getPath()));
-
-            // throw an content.node.load event (disabled for now)
-            //$event = new ContentNodeEvent($node, $structure);
-            //$this->eventDispatcher->dispatch(ContentEvents::NODE_LOAD, $event);
-
-            $result[] = new BreadcrumbItem($depth, $nodeUuid, $nodeName);
-        }
-
-        return $result;
+        return $this->documentToStructure($document);
     }
 
     /**
-     * deletes content with subcontent in given webspace
-     * @param string $uuid UUID of content
-     * @param string $webspaceKey Key of webspace
+     * {@inheritdoc}
+     */
+    public function loadByNode(
+        NodeInterface $node,
+        $locale,
+        $webspaceKey = null,
+        $excludeGhost = true,
+        $loadGhostContent = false,
+        $excludeShadow = true
+    ) {
+        $document = $this->loadDocument(
+            $node->getIdentifier(),
+            $locale,
+            [
+                'load_ghost_content' => $loadGhostContent,
+                'exclude_ghost' => $excludeGhost,
+                'exclude_shadow' => $excludeShadow,
+            ]
+        );
+
+        return $this->documentToStructure($document);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function loadBreadcrumb($uuid, $locale, $webspaceKey)
+    {
+        $document = $this->documentManager->find($uuid, $locale);
+
+        $documents = [];
+        $contentDocument = $this->getContentDocument($webspaceKey, $locale);
+        $contentDepth = $this->inspector->getDepth($contentDocument);
+        $document = $this->inspector->getParent($document);
+        $documentDepth = $this->inspector->getDepth($document);
+
+        while ($document instanceof StructureBehavior && $documentDepth >= $contentDepth) {
+            $documents[] = $document;
+
+            $document = $this->inspector->getParent($document);
+            $documentDepth = $this->inspector->getDepth($document);
+        }
+
+        $items = [];
+        foreach ($documents as $document) {
+            $items[] = new BreadcrumbItem(
+                $this->inspector->getDepth($document) - $contentDepth,
+                $this->inspector->getUuid($document),
+                $document->getTitle()
+            );
+        }
+
+        $items = array_reverse($items);
+
+        return $items;
+    }
+
+    /**
+     * {@inheritdoc}
      */
     public function delete($uuid, $webspaceKey)
     {
-        $session = $this->getSession();
-        $contentNode = $session->getNodeByIdentifier($uuid);
-
-        $this->deleteRecursively($contentNode);
-        $session->save();
+        $document = $this->documentManager->find($uuid);
+        $this->documentManager->remove($document);
+        $this->documentManager->flush();
     }
 
     /**
-     * remove node with references (path, history path ...)
-     * @param NodeInterface $node
+     * {@inheritdoc}
      */
-    private function deleteRecursively(NodeInterface $node)
+    public function move($uuid, $destParentUuid, $userId, $webspaceKey, $locale)
     {
-        foreach ($node->getReferences() as $ref) {
-            if ($ref instanceof \PHPCR\PropertyInterface) {
-                $this->deleteRecursively($ref->getParent());
-            } else {
-                $this->deleteRecursively($ref);
-            }
-        }
-        $node->remove();
+        return $this->copyOrMove($uuid, $destParentUuid, $userId, $webspaceKey, $locale);
     }
 
     /**
-     * returns a structure with given key
-     * @param string $key key of content type
+     * {@inheritdoc}
+     */
+    public function copy($uuid, $destParentUuid, $userId, $webspaceKey, $locale)
+    {
+        return $this->copyOrMove($uuid, $destParentUuid, $userId, $webspaceKey, $locale, false);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function copyLanguage(
+        $uuid,
+        $userId,
+        $webspaceKey,
+        $srcLocale,
+        $destLocales,
+        $structureType = LegacyStructure::TYPE_PAGE
+    ) {
+        if (!is_array($destLocales)) {
+            $destLocales = [$destLocales];
+        }
+
+        $document = $this->documentManager->find($uuid, $srcLocale);
+        $parentDocument = $this->inspector->getParent($document);
+
+        $resourceLocatorType = $this->getResourceLocator();
+
+        foreach ($destLocales as $destLocale) {
+            $document->setLocale($destLocale);
+            $document->getStructure()->bind($document->getStructure()->toArray());
+
+            // TODO: This can be removed if RoutingAuto replaces the ResourceLocator code.
+            if ($document instanceof ResourceSegmentBehavior) {
+                $parentResourceLocator = $resourceLocatorType->getResourceLocatorByUuid(
+                    $parentDocument->getUUid(),
+                    $webspaceKey,
+                    $destLocale
+                );
+                $resourceLocator = $resourceLocatorType->getStrategy()->generate(
+                    $document->getTitle(),
+                    $parentResourceLocator,
+                    $webspaceKey,
+                    $destLocale
+                );
+
+                $document->setResourceSegment($resourceLocator);
+            }
+
+            $this->documentManager->persist($document, $destLocale);
+        }
+        $this->documentManager->flush();
+
+        return $this->documentToStructure($document);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function orderBefore($uuid, $beforeUuid, $userId, $webspaceKey, $locale)
+    {
+        $document = $this->documentManager->find($uuid, $locale);
+        $this->documentManager->reorder($document, $beforeUuid);
+        $this->documentManager->persist($document, $locale, [
+            'user' => $userId,
+        ]);
+
+        return $this->documentToStructure($document);
+    }
+
+    /**
+     * TODO: Move this logic to the DocumentManager
+     * {@inheritdoc}
+     */
+    public function orderAt($uuid, $position, $userId, $webspaceKey, $locale)
+    {
+        $document = $this->documentManager->find($uuid, $locale);
+
+        $parentDocument = $this->inspector->getParent($document);
+        $siblingDocuments = $this->inspector->getChildren($parentDocument);
+
+        $siblings = array_values($siblingDocuments->toArray()); // get indexed array
+        $countSiblings = count($siblings);
+        $currentPosition = array_search($document, $siblings) + 1;
+
+        if ($countSiblings < $position || $position <= 0) {
+            throw new InvalidOrderPositionException(sprintf(
+                'Cannot order node "%s" at out-of-range position "%s", must be >= 0 && < %d"',
+                $this->inspector->getPath($document),
+                $position,
+                $countSiblings
+            ));
+        }
+
+        if ($position === $countSiblings) {
+            // move to the end
+            $this->documentManager->reorder($document, null);
+        } else {
+            if ($currentPosition < $position) {
+                $targetSibling = $siblings[$position];
+            } elseif ($currentPosition > $position) {
+                $targetSibling = $siblings[$position - 1];
+            }
+
+            $this->documentManager->reorder($document, $targetSibling->getPath());
+        }
+
+        // this should not be necessary (see https://github.com/sulu-io/sulu-document-manager/issues/39)
+        foreach ($siblingDocuments as $siblingDocument) {
+            $this->documentManager->persist($siblingDocument, $locale);
+        }
+
+        $this->documentManager->flush();
+
+        return $this->documentToStructure($document);
+    }
+
+    /**
+     * Copy or move a node by UUID to a detination parent.
+     *
+     * Note that the bulk of this method is about the resource locator and can
+     * be removed if we integrate the RoutingAuto component.
+     *
+     * @param string $webspaceKey
+     * @param string $locale
+     * @param bool $move
+     *
      * @return StructureInterface
      */
-    protected function getStructure($key)
+    private function copyOrMove($uuid, $destParentUuid, $userId, $webspaceKey, $locale, $move = true)
     {
-        return $this->structureManager->getStructure($key);
+        // find localizations
+        $webspace = $this->webspaceManager->findWebspaceByKey($webspaceKey);
+        $localizations = $webspace->getAllLocalizations();
+
+        // load from phpcr
+        $document = $this->documentManager->find($uuid, $locale);
+        $parentDocument = $this->documentManager->find($destParentUuid, $locale);
+
+        if ($move) {
+            // move node
+            $this->documentManager->move($document, $destParentUuid);
+        } else {
+            // copy node
+            $copiedPath = $this->documentManager->copy($document, $destParentUuid);
+            $document = $this->documentManager->find($copiedPath, $locale);
+            $this->documentManager->refresh($parentDocument);
+        }
+
+        $originalLocale = $locale;
+
+        // modifiy the resource locators -- note this can be removed once the routing auto
+        // system is implemented.
+        foreach ($localizations as $locale) {
+            $locale = $locale->getLocalization();
+
+            if (!$document instanceof ResourceSegmentBehavior) {
+                break;
+            }
+
+            // prepare parent content node
+            // finding the document will update the locale without reloading from PHPCR
+            $this->documentManager->find($document->getUuid(), $locale);
+            $this->documentManager->find($parentDocument->getUuid(), $locale);
+
+            // TODO: This could be optimized
+            $localizationState = $this->inspector->getLocalizationState($document);
+            if ($localizationState === LocalizationState::GHOST) {
+                continue;
+            }
+
+            if ($document->getRedirectType() !== RedirectType::NONE) {
+                continue;
+            }
+
+            $strategy = $this->getResourceLocator()->getStrategy();
+            $nodeName = PathHelper::getNodeName($document->getResourceSegment());
+            $newResourceLocator = $strategy->generate(
+                $nodeName,
+                $parentDocument->getResourceSegment(),
+                $webspaceKey,
+                $locale
+            );
+
+            $document->setResourceSegment($newResourceLocator);
+
+            $this->documentManager->persist($document, $locale, [
+                'user' => $userId,
+            ]);
+        }
+
+        $this->documentManager->flush();
+
+        $this->documentManager->find($document->getUuid(), $originalLocale);
+
+        return $this->documentToStructure($document);
     }
 
     /**
+     * Return the resource locator content type.
+     *
      * @return ResourceLocatorInterface
      */
     public function getResourceLocator()
     {
-        return $this->getContentType('resource_locator');
+        return $this->contentTypeManager->get('resource_locator');
     }
 
     /**
-     * returns a type with given name
-     * @param $name
-     * @return ContentTypeInterface
-     */
-    protected function getContentType($name)
-    {
-        return $this->contentTypeManager->get($name);
-    }
-
-    /**
+     * Return the content document (aka the home page).
+     *
      * @param $webspaceKey
-     * @return NodeInterface
+     *
+     * @return Document
      */
-    protected function getContentNode($webspaceKey)
+    private function getContentDocument($webspaceKey, $locale, array $options = [])
     {
-        return $this->sessionManager->getContentNode($webspaceKey);
+        return $this->documentManager->find(
+            $this->sessionManager->getContentPath($webspaceKey),
+            $locale,
+            $options
+        );
     }
 
     /**
-     * @return SessionInterface
-     */
-    protected function getSession()
-    {
-        return $this->sessionManager->getSession();
-    }
-
-    /**
+     * Return the node in the content repository which contains all of the routes.
+     *
      * @param $webspaceKey
-     * @param string $languageCode
+     * @param string $locale
      * @param string $segment
+     *
      * @return NodeInterface
      */
-    protected function getRouteNode($webspaceKey, $languageCode, $segment)
+    protected function getRootRouteNode($webspaceKey, $locale, $segment)
     {
-        return $this->sessionManager->getRouteNode($webspaceKey, $languageCode, $segment);
+        return $this->documentManager->find(
+            $this->sessionManager->getRoutePath($webspaceKey, $locale, $segment)
+        );
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function convertQueryResultToArray(
+        QueryResultInterface $queryResult,
+        $webspaceKey,
+        $locales,
+        $fields,
+        $maxDepth,
+        $onlyPublished = true
+    ) {
+        $rootDepth = substr_count($this->sessionManager->getContentPath($webspaceKey), '/');
+
+        $result = [];
+        foreach ($locales as $locale) {
+            foreach ($queryResult->getRows() as $row) {
+                $pageDepth = substr_count($row->getPath('page'), '/') - $rootDepth;
+
+                if ($maxDepth === null || $maxDepth < 0 || ($maxDepth > 0 && $pageDepth <= $maxDepth)) {
+                    $item = $this->rowToArray($row, $locale, $webspaceKey, $fields, $onlyPublished);
+
+                    if (false === $item || in_array($item, $result)) {
+                        continue;
+                    }
+
+                    $result[] = $item;
+                }
+            };
+        }
+
+        return $result;
     }
 
     /**
      * @param $name
      * @param NodeInterface $parent
+     *
      * @return string
      */
     private function getUniquePath($name, NodeInterface $parent)
@@ -1118,7 +850,7 @@ class ContentMapper implements ContentMapperInterface
         if ($parent->hasNode($name)) {
             $i = 0;
             do {
-                $i++;
+                ++$i;
             } while ($parent->hasNode($name . '-' . $i));
 
             return $name . '-' . $i;
@@ -1127,49 +859,328 @@ class ContentMapper implements ContentMapperInterface
         }
     }
 
-    private function getInheritedState(NodeInterface $contentNode, $statePropertyName, $webspaceKey)
+    /**
+     * converts a query row to an array.
+     */
+    private function rowToArray(Row $row, $locale, $webspaceKey, $fields, $onlyPublished = true)
     {
-        // index page is default PUBLISHED
-        $contentRootNode = $this->getContentNode($webspaceKey);
-        if ($contentNode->getName() === $contentRootNode->getPath()) {
-            return StructureInterface::STATE_PUBLISHED;
+        // reset cache
+        $this->initializeExtensionCache();
+        $templateName = $this->encoder->localizedSystemName('template', $locale);
+        $nodeTypeName = $this->encoder->localizedSystemName('nodeType', $locale);
+
+        // check and determine shadow-nodes
+        $node = $row->getNode('page');
+        $document = $this->documentManager->find($node->getIdentifier(), $locale);
+        $originalDocument = $document;
+
+        if (!$node->hasProperty($templateName) && !$node->hasProperty($nodeTypeName)) {
+            return false;
         }
 
-        // if test then return it
-        if ($contentNode->getPropertyValueWithDefault(
-                $statePropertyName,
-                StructureInterface::STATE_TEST
-            ) === StructureInterface::STATE_TEST
-        ) {
-            return StructureInterface::STATE_TEST;
-        }
+        $redirectType = $document->getRedirectType();
 
-        $session = $this->getSession();
-        $workspace = $session->getWorkspace();
-        $queryManager = $workspace->getQueryManager();
+        if ($redirectType === RedirectType::INTERNAL) {
+            $target = $document->getRedirectTarget();
 
-        $sql = 'SELECT *
-                FROM  [sulu:content] as parent INNER JOIN [sulu:content] as child
-                    ON ISDESCENDANTNODE(child, parent)
-                WHERE child.[jcr:uuid]="' . $contentNode->getIdentifier() . '"';
+            if ($target) {
+                $url = $target->getResourceSegment();
 
-        $query = $queryManager->createQuery($sql, 'JCR-SQL2');
-        $result = $query->execute();
-
-        /** @var \PHPCR\NodeInterface $node */
-        foreach ($result->getNodes() as $node) {
-            // exclude /cmf/sulu_io/contents
-            if (
-                $node->getPath() !== $contentRootNode->getPath() &&
-                $node->getPropertyValueWithDefault(
-                    $statePropertyName,
-                    StructureInterface::STATE_TEST
-                ) === StructureInterface::STATE_TEST
-            ) {
-                return StructureInterface::STATE_TEST;
+                $document = $target;
+                $node = $this->inspector->getNode($document);
             }
         }
 
-        return StructureInterface::STATE_PUBLISHED;
+        if ($redirectType === RedirectType::EXTERNAL) {
+            $url = $document->getRedirectExternal();
+        }
+
+        $originLocale = $locale;
+        if ($document instanceof ShadowLocaleBehavior) {
+            $locale = $document->isShadowLocaleEnabled() ? $document->getShadowLocale() : $originLocale;
+        }
+
+        $nodeState = null;
+        if ($document instanceof WorkflowStageBehavior) {
+            $nodeState = $document->getWorkflowStage();
+        }
+
+        // if page is not piblished ignore it
+        if ($onlyPublished && $nodeState !== WorkflowStage::PUBLISHED) {
+            return false;
+        }
+
+        if (!isset($url)) {
+            $url = $document->getResourceSegment();
+        }
+
+        if (false === $url) {
+            return;
+        }
+
+        // generate field data
+        $fieldsData = $this->getFieldsData(
+            $row,
+            $node,
+            $document,
+            $fields[$originLocale],
+            $document->getStructureType(),
+            $webspaceKey,
+            $locale
+        );
+
+        $structureType = $document->getStructureType();
+        $shortPath = $this->inspector->getContentPath($originalDocument);
+
+        $documentData = [
+            'uuid' => $document->getUuid(),
+            'nodeType' => $redirectType,
+            'path' => $shortPath,
+            'changed' => $document->getChanged(),
+            'changer' => $document->getChanger(),
+            'created' => $document->getCreated(),
+            'published' => $document->getPublished(),
+            'creator' => $document->getCreator(),
+            'title' => $originalDocument->getTitle(),
+            'url' => $url,
+            'urls' => $this->inspector->getLocalizedUrlsForPage($document),
+            'locale' => $locale,
+            'webspaceKey' => $this->inspector->getWebspace($document),
+            'template' => $structureType,
+            'parent' => $this->inspector->getParent($document)->getUuid(),
+        ];
+
+        if ($document instanceof OrderBehavior) {
+            $documentData['order'] = $document->getSuluOrder();
+        }
+
+        return array_merge($documentData, $fieldsData);
+    }
+
+    /**
+     * Return extracted data (configured by fields array) from node.
+     */
+    private function getFieldsData(Row $row, NodeInterface $node, $document, $fields, $templateKey, $webspaceKey, $locale)
+    {
+        $fieldsData = [];
+        foreach ($fields as $field) {
+            // determine target for data in result array
+            if (isset($field['target'])) {
+                if (!isset($fieldsData[$field['target']])) {
+                    $fieldsData[$field['target']] = [];
+                }
+                $target = &$fieldsData[$field['target']];
+            } else {
+                $target = &$fieldsData;
+            }
+
+            // create target
+            if (!isset($target[$field['name']])) {
+                $target[$field['name']] = '';
+            }
+            if (($data = $this->getFieldData($field, $row, $node, $document, $templateKey, $webspaceKey, $locale)) !== null) {
+                $target[$field['name']] = $data;
+            }
+        }
+
+        return $fieldsData;
+    }
+
+    /**
+     * Return data for one field.
+     */
+    private function getFieldData($field, Row $row, NodeInterface $node, $document, $templateKey, $webspaceKey, $locale)
+    {
+        if (isset($field['column'])) {
+            // normal data from node property
+            return $row->getValue($field['column']);
+        } elseif (isset($field['extension'])) {
+            // data from extension
+            return $this->getExtensionData(
+                $node,
+                $field['extension'],
+                $field['property'],
+                $webspaceKey,
+                $locale
+            );
+        } elseif (
+            isset($field['property'])
+            && (!isset($field['templateKey']) || $field['templateKey'] === $templateKey)
+        ) {
+            // not extension data but property of node
+            return $this->getPropertyData($document, $field['property']);
+        }
+
+        return;
+    }
+
+    /**
+     * Returns data for property.
+     */
+    private function getPropertyData($document, LegacyProperty $property)
+    {
+        return $document->getStructure()->getContentViewProperty($property->getName())->getValue();
+    }
+
+    /**
+     * Returns data for extension and property name.
+     */
+    private function getExtensionData(
+        NodeInterface $node,
+        ExtensionInterface $extension,
+        $propertyName,
+        $webspaceKey,
+        $locale
+    ) {
+        // extension data: load ones
+        if (!$this->extensionDataCache->contains($extension->getName())) {
+            $this->extensionDataCache->save(
+                $extension->getName(),
+                $this->loadExtensionData(
+                    $node,
+                    $extension,
+                    $webspaceKey,
+                    $locale
+                )
+            );
+        }
+
+        // get extension data from cache
+        $data = $this->extensionDataCache->fetch($extension->getName());
+
+        // if property exists set it to target (with default value '')
+        return isset($data[$propertyName]) ? $data[$propertyName] : null;
+    }
+
+    /**
+     * load data from extension.
+     */
+    private function loadExtensionData(NodeInterface $node, ExtensionInterface $extension, $webspaceKey, $locale)
+    {
+        $extension->setLanguageCode($locale, $this->namespaceRegistry->getPrefix('extension_localized'), '');
+        $data = $extension->load(
+            $node,
+            $webspaceKey,
+            $locale
+        );
+
+        return $extension->getContentData($data);
+    }
+
+    /**
+     * TODO: Move this to ResourceLocator repository>.
+     *
+     * {@inheritdoc}
+     */
+    public function restoreHistoryPath($path, $userId, $webspaceKey, $locale, $segmentKey = null)
+    {
+        $this->strategy->restoreByPath($path, $webspaceKey, $locale, $segmentKey);
+
+        $content = $this->loadByResourceLocator($path, $webspaceKey, $locale, $segmentKey);
+        $property = $content->getPropertyByTagName('sulu.rlp');
+        $property->setValue($path);
+
+        $node = $this->sessionManager->getSession()->getNodeByIdentifier($content->getUuid());
+
+        $contentType = $this->contentTypeManager->get($property->getContentTypeName());
+        $contentType->write(
+            $node,
+            new TranslatedProperty($property, $locale, $this->namespaceRegistry->getPrefix('content_localized')),
+            $userId,
+            $webspaceKey,
+            $locale,
+            $segmentKey
+        );
+    }
+
+    private function loadDocument($pathOrUuid, $locale, $options, $shouldExclude = true)
+    {
+        $document = $this->documentManager->find($pathOrUuid, $locale, [
+            'load_ghost_content' => isset($options['load_ghost_content']) ? $options['load_ghost_content'] : true,
+        ]);
+
+        if ($shouldExclude && $this->optionsShouldExcludeDocument($document, $options)) {
+            return;
+        }
+
+        return $document;
+    }
+
+    private function optionsShouldExcludeDocument($document, array $options = null)
+    {
+        if ($options === null) {
+            return false;
+        }
+
+        $options = array_merge([
+            'exclude_ghost' => true,
+            'exclude_shadow' => true,
+        ], $options);
+
+        $state = $this->inspector->getLocalizationState($document);
+
+        if ($options['exclude_ghost'] && $state == LocalizationState::GHOST) {
+            return true;
+        }
+
+        if ($options['exclude_ghost'] && $options['exclude_shadow'] && $state == LocalizationState::SHADOW) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Initializes cache of extension data.
+     */
+    private function initializeExtensionCache()
+    {
+        $this->extensionDataCache = new ArrayCache();
+    }
+
+    /**
+     * Return a structure bridge corresponding to the given document.
+     *
+     * @param DocumentInterface $document
+     *
+     * @return StructureBridge
+     */
+    private function documentToStructure($document)
+    {
+        if (null === $document) {
+            return;
+        }
+        $structure = $this->inspector->getStructureMetadata($document);
+        $documentAlias = $this->inspector->getMetadata($document)->getAlias();
+
+        $structureBridge = $this->structureManager->wrapStructure($documentAlias, $structure);
+        $structureBridge->setDocument($document);
+
+        return $structureBridge;
+    }
+
+    /**
+     * Return a collection of structures for the given documents, optionally filtering according
+     * to the given options (as defined in optionsShouldExcludeDocument).
+     *
+     * @param object[] $documents
+     * @param array|null $filterOptions
+     */
+    private function documentsToStructureCollection($documents, $filterOptions = null)
+    {
+        $collection = [];
+        foreach ($documents as $document) {
+            if (!$document instanceof StructureBehavior) {
+                continue;
+            }
+
+            if ($this->optionsShouldExcludeDocument($document, $filterOptions)) {
+                continue;
+            }
+
+            $collection[] = $this->documentToStructure($document);
+        }
+
+        return $collection;
     }
 }

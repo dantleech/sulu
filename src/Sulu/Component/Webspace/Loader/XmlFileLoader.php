@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,15 +11,21 @@
 
 namespace Sulu\Component\Webspace\Loader;
 
+use Sulu\Component\Localization\Localization;
 use Sulu\Component\Webspace\Environment;
+use Sulu\Component\Webspace\Loader\Exception\ExpectedDefaultTemplatesNotFound;
+use Sulu\Component\Webspace\Loader\Exception\InvalidAmountOfDefaultErrorTemplateException;
+use Sulu\Component\Webspace\Loader\Exception\InvalidDefaultErrorTemplateException;
+use Sulu\Component\Webspace\Loader\Exception\InvalidDefaultLocalizationException;
+use Sulu\Component\Webspace\Loader\Exception\InvalidErrorTemplateException;
 use Sulu\Component\Webspace\Loader\Exception\InvalidPortalDefaultLocalizationException;
+use Sulu\Component\Webspace\Loader\Exception\InvalidUrlDefinitionException;
 use Sulu\Component\Webspace\Loader\Exception\InvalidWebspaceDefaultLocalizationException;
 use Sulu\Component\Webspace\Loader\Exception\InvalidWebspaceDefaultSegmentException;
 use Sulu\Component\Webspace\Loader\Exception\PortalDefaultLocalizationNotFoundException;
-use Sulu\Component\Webspace\Loader\Exception\InvalidUrlDefinitionException;
-use Sulu\Component\Webspace\Loader\Exception\WebspaceDefaultLocalizationNotFoundException;
 use Sulu\Component\Webspace\Loader\Exception\WebspaceDefaultSegmentNotFoundException;
-use Sulu\Component\Webspace\Localization;
+use Sulu\Component\Webspace\Navigation;
+use Sulu\Component\Webspace\NavigationContext;
 use Sulu\Component\Webspace\Portal;
 use Sulu\Component\Webspace\Security;
 use Sulu\Component\Webspace\Segment;
@@ -33,21 +40,23 @@ class XmlFileLoader extends FileLoader
     const SCHEME_PATH = '/schema/webspace/webspace-1.0.xsd';
 
     /**
-     * @var  \DOMXPath
+     * @var \DOMXPath
      */
     private $xpath;
 
     /**
-     * The webspace which is created by this file loader
+     * The webspace which is created by this file loader.
+     *
      * @var Webspace
      */
     private $webspace;
 
     /**
-     * Loads a webspace from a xml file
+     * Loads a webspace from a xml file.
      *
-     * @param mixed $resource The resource
-     * @param string $type The resource type
+     * @param mixed  $resource The resource
+     * @param string $type     The resource type
+     *
      * @return Webspace The webspace object for the given resource
      */
     public function load($resource, $type = null)
@@ -63,10 +72,10 @@ class XmlFileLoader extends FileLoader
     /**
      * Returns true if this class supports the given resource.
      *
-     * @param mixed $resource A resource
-     * @param string $type The resource type
+     * @param mixed  $resource A resource
+     * @param string $type     The resource type
      *
-     * @return Boolean true if this class supports the given resource, false otherwise
+     * @return bool true if this class supports the given resource, false otherwise
      */
     public function supports($resource, $type = null)
     {
@@ -74,8 +83,8 @@ class XmlFileLoader extends FileLoader
     }
 
     /**
-     *
      * @param $file
+     *
      * @return Portal
      */
     private function parseXml($file)
@@ -90,6 +99,7 @@ class XmlFileLoader extends FileLoader
         $this->webspace->setName($this->xpath->query('/x:webspace/x:name')->item(0)->nodeValue);
         $this->webspace->setKey($this->xpath->query('/x:webspace/x:key')->item(0)->nodeValue);
         $this->webspace->setTheme($this->generateTheme());
+        $this->webspace->setNavigation($this->generateNavigation());
 
         // set security
         $this->generateSecurity();
@@ -109,62 +119,19 @@ class XmlFileLoader extends FileLoader
         return $this->webspace;
     }
 
+    /**
+     * Validate result.
+     */
     private function validate()
     {
-        // check if there are duplicate defaults in the webspace localizations
-        $webspaceDefaultLocalizationFound = false;
-        foreach ($this->webspace->getLocalizations() as $webspaceLocalization) {
-            if ($webspaceLocalization->isDefault()) {
-                // throw an exception, if a new default localization is found, although there already is one
-                if ($webspaceDefaultLocalizationFound) {
-                    throw new InvalidWebspaceDefaultLocalizationException($this->webspace);
-                }
-                $webspaceDefaultLocalizationFound = true;
-            }
-        }
-
-        // check all portal localizations
-        foreach ($this->webspace->getPortals() as $portal) {
-            $portalDefaultLocalizationFound = false;
-            foreach ($portal->getLocalizations() as $portalLocalizations) {
-                if ($portalLocalizations->isDefault()) {
-                    if ($portalDefaultLocalizationFound) {
-                        throw new InvalidPortalDefaultLocalizationException($this->webspace, $portal);
-                    }
-                    $portalDefaultLocalizationFound = true;
-                }
-            }
-
-            if (!$portalDefaultLocalizationFound) {
-                // try to load the webspace localizations before throwing an exception
-                if (!$this->loadPortalLocalizationDefaultFromWebspace($portal)) {
-                    throw new PortalDefaultLocalizationNotFoundException($this->webspace, $portal);
-                }
-            }
-        }
-
-        // check if there are duplicate defaults in the webspaces segments
-        $segments = $this->webspace->getSegments();
-        if ($segments) {
-            $webspaceDefaultSegmentFound = false;
-            foreach ($segments as $webspaceSegment) {
-                if ($webspaceSegment->isDefault()) {
-                    // throw an exception, if a new default segment is found, although there already is one
-                    if ($webspaceDefaultSegmentFound) {
-                        throw new InvalidWebspaceDefaultSegmentException($this->webspace);
-                    }
-                    $webspaceDefaultSegmentFound = true;
-                }
-            }
-
-            if (!$webspaceDefaultSegmentFound) {
-                throw new WebspaceDefaultSegmentNotFoundException($this->webspace);
-            }
-        }
+        $this->validateWebspaceDefaultLocalization();
+        $this->validateDefaultPortalLocalization();
+        $this->validateWebspaceDefaultSegment();
     }
 
     /**
      * @param $portal Portal
+     *
      * @return bool True when successful, otherwise false
      */
     private function loadPortalLocalizationDefaultFromWebspace($portal)
@@ -177,6 +144,7 @@ class XmlFileLoader extends FileLoader
             ) {
                 $localization->setDefault(true);
                 $portal->setDefaultLocalization($localization);
+
                 return true;
             }
         }
@@ -186,7 +154,7 @@ class XmlFileLoader extends FileLoader
 
     /**
      * @param \DOMNode $portalNode
-     * @param Portal $portal
+     * @param Portal   $portal
      */
     private function generatePortalLocalizations(\DOMNode $portalNode, Portal $portal)
     {
@@ -203,8 +171,9 @@ class XmlFileLoader extends FileLoader
 
     /**
      * @param \DOMNodeList $localizationNodes
-     * @param Portal $portal
-     * @param bool $flat
+     * @param Portal       $portal
+     * @param bool         $flat
+     *
      * @internal param \DOMXpath $xpath
      */
     private function generateLocalizationsFromNodeList(\DOMNodeList $localizationNodes, Portal $portal, $flat = false)
@@ -218,9 +187,11 @@ class XmlFileLoader extends FileLoader
 
     /**
      * @param \DOMElement|\DOMNode $localizationNode
-     * @param bool $flat
-     * @param null $parent
+     * @param bool                 $flat
+     * @param null                 $parent
+     *
      * @internal param \DOMXPath $xpath
+     *
      * @return Localization
      */
     private function generateLocalizationFromNode(\DOMElement $localizationNode, $flat = false, $parent = null)
@@ -249,6 +220,13 @@ class XmlFileLoader extends FileLoader
             $localization->setDefault($defaultNode->nodeValue == 'true');
         } else {
             $localization->setDefault(false);
+        }
+
+        $xDefaultNode = $localizationNode->attributes->getNamedItem('x-default');
+        if ($xDefaultNode) {
+            $localization->setXDefault($xDefaultNode->nodeValue == 'true');
+        } else {
+            $localization->setXDefault(false);
         }
 
         // set child nodes
@@ -324,24 +302,110 @@ class XmlFileLoader extends FileLoader
 
     /**
      * @internal param \DOMNode $webspaceNode
+     *
      * @return Theme
      */
     private function generateTheme()
     {
         $theme = new Theme();
         $theme->setKey($this->xpath->query('/x:webspace/x:theme/x:key')->item(0)->nodeValue);
+        $this->generateErrorTemplates($theme);
+        $this->generateDefaultTemplates($theme);
 
-        foreach ($this->xpath->query('/x:webspace/x:theme/x:excluded/x:template') as $templateNode) {
-            /** @var \DOMNode $templateNode */
-            $theme->addExcludedTemplate($templateNode->nodeValue);
+        return $theme;
+    }
+
+    private function generateErrorTemplates(Theme $theme)
+    {
+        $defaultErrorTemplates = 0;
+
+        foreach ($this->xpath->query('/x:webspace/x:theme/x:error-templates/x:error-template') as $errorTemplateNode) {
+            /* @var \DOMNode $errorTemplateNode */
+            $template = $errorTemplateNode->nodeValue;
+            if (($codeNode = $errorTemplateNode->attributes->getNamedItem('code')) !== null) {
+                $code = $codeNode->nodeValue;
+            } elseif (($defaultNode = $errorTemplateNode->attributes->getNamedItem('default')) !== null) {
+                $default = $defaultNode->nodeValue === 'true';
+                if (!$default) {
+                    throw new InvalidDefaultErrorTemplateException($template, $this->webspace->getKey());
+                }
+                ++$defaultErrorTemplates;
+                $code = 'default';
+            } else {
+                throw new InvalidErrorTemplateException($template, $this->webspace->getKey());
+            }
+
+            $theme->addErrorTemplate($code, $template);
+        }
+
+        // only one or none default error-template is legal
+        if ($defaultErrorTemplates > 1) {
+            throw new InvalidAmountOfDefaultErrorTemplateException($this->webspace->getKey());
         }
 
         return $theme;
     }
 
+    private function generateDefaultTemplates(Theme $theme)
+    {
+        $expected = ['page', 'homepage'];
+        $found = [];
+        $nodes = $this->xpath->query('/x:webspace/x:theme/x:default-templates/x:default-template');
+
+        foreach ($nodes as $node) {
+            /* @var \DOMNode $node */
+            $template = $node->nodeValue;
+            $type = $node->attributes->getNamedItem('type')->nodeValue;
+
+            $theme->addDefaultTemplate($type, $template);
+            $found[] = $type;
+        }
+
+        foreach ($expected as $item) {
+            if (!in_array($item, $found)) {
+                throw new ExpectedDefaultTemplatesNotFound($this->webspace->getKey(), $expected, $found);
+            }
+        }
+
+        return $theme;
+    }
+
+    private function generateNavigation()
+    {
+        $contexts = [];
+
+        foreach ($this->xpath->query('/x:webspace/x:navigation/x:contexts/x:context') as $contextNode) {
+            /* @var \DOMNode $contextNode */
+            $contexts[] = new NavigationContext(
+                $contextNode->attributes->getNamedItem('key')->nodeValue,
+                $this->loadMeta('x:meta/x:*', $contextNode)
+            );
+        }
+
+        return new Navigation($contexts);
+    }
+
+    private function loadMeta($path, \DOMNode $context = null)
+    {
+        $result = [];
+
+        /** @var \DOMElement $node */
+        foreach ($this->xpath->query($path, $context) as $node) {
+            $attribute = $node->tagName;
+            $lang = $this->xpath->query('@lang', $node)->item(0)->nodeValue;
+
+            if (!isset($result[$node->tagName])) {
+                $result[$attribute] = [];
+            }
+            $result[$attribute][$lang] = $node->textContent;
+        }
+
+        return $result;
+    }
+
     /**
      * @param \DOMNode $portalNode
-     * @param Portal $portal
+     * @param Portal   $portal
      */
     private function generateEnvironments(\DOMNode $portalNode, Portal $portal)
     {
@@ -357,8 +421,9 @@ class XmlFileLoader extends FileLoader
     }
 
     /**
-     * @param \DOMNode $environmentNode
+     * @param \DOMNode    $environmentNode
      * @param Environment $environment
+     *
      * @throws Exception\InvalidUrlDefinitionException
      */
     private function generateUrls(\DOMNode $environmentNode, Environment $environment)
@@ -372,31 +437,35 @@ class XmlFileLoader extends FileLoader
             /** @var \DOMNode $urlNode */
             $url = new Url();
 
-            $url->setUrl($urlNode->nodeValue);
+            $url->setUrl(rtrim($urlNode->nodeValue, '/'));
 
             // set optional nodes
             $url->setLanguage($this->getOptionalNodeAttribute($urlNode, 'language'));
             $url->setCountry($this->getOptionalNodeAttribute($urlNode, 'country'));
             $url->setSegment($this->getOptionalNodeAttribute($urlNode, 'segment'));
             $url->setRedirect($this->getOptionalNodeAttribute($urlNode, 'redirect'));
+            $url->setMain($this->getOptionalNodeAttribute($urlNode, 'main', false));
+            $url->setAnalyticsKey($this->getOptionalNodeAttribute($urlNode, 'analytics-key'));
 
             $environment->addUrl($url);
         }
     }
 
-    private function getOptionalNodeAttribute(\DOMNode $node, $name)
+    private function getOptionalNodeAttribute(\DOMNode $node, $name, $default = null)
     {
         $attribute = $node->attributes->getNamedItem($name);
         if ($attribute) {
             return $attribute->nodeValue;
         }
 
-        return null;
+        return $default;
     }
 
     /**
-     * Checks if the urlNode is valid for this webspace
+     * Checks if the urlNode is valid for this webspace.
+     *
      * @param \DOMNode $urlNode
+     *
      * @return bool
      */
     private function checkUrlNode(\DOMNode $urlNode)
@@ -415,5 +484,94 @@ class XmlFileLoader extends FileLoader
         $hasRedirect = ($urlNode->attributes->getNamedItem('redirect') != null);
 
         return ($hasLanguage && $hasSegment) || $hasRedirect;
+    }
+
+    /**
+     * Validate default webspace localization.
+     *
+     * @throws Exception\InvalidWebspaceDefaultLocalizationException
+     */
+    private function validateWebspaceDefaultLocalization()
+    {
+        try {
+            $this->validateDefaultLocalization($this->webspace->getLocalizations());
+        } catch (InvalidDefaultLocalizationException $ex) {
+            throw new InvalidWebspaceDefaultLocalizationException($this->webspace);
+        }
+    }
+
+    /**
+     * Validate portal localization.
+     *
+     * @throws Exception\PortalDefaultLocalizationNotFoundException
+     * @throws Exception\InvalidPortalDefaultLocalizationException
+     */
+    private function validateDefaultPortalLocalization()
+    {
+        // check all portal localizations
+        foreach ($this->webspace->getPortals() as $portal) {
+            try {
+                if (!$this->validateDefaultLocalization($portal->getLocalizations())) {
+                    // try to load the webspace localizations before throwing an exception
+                    if (!$this->loadPortalLocalizationDefaultFromWebspace($portal)) {
+                        throw new PortalDefaultLocalizationNotFoundException($this->webspace, $portal);
+                    }
+                }
+            } catch (InvalidDefaultLocalizationException $ex) {
+                throw new InvalidPortalDefaultLocalizationException($this->webspace, $portal);
+            }
+        }
+    }
+
+    /**
+     * Validate webspace default segment.
+     *
+     * @throws Exception\WebspaceDefaultSegmentNotFoundException
+     * @throws Exception\InvalidWebspaceDefaultSegmentException
+     */
+    private function validateWebspaceDefaultSegment()
+    {
+        // check if there are duplicate defaults in the webspaces segments
+        $segments = $this->webspace->getSegments();
+        if ($segments) {
+            $webspaceDefaultSegmentFound = false;
+            foreach ($segments as $webspaceSegment) {
+                if ($webspaceSegment->isDefault()) {
+                    // throw an exception, if a new default segment is found, although there already is one
+                    if ($webspaceDefaultSegmentFound) {
+                        throw new InvalidWebspaceDefaultSegmentException($this->webspace);
+                    }
+                    $webspaceDefaultSegmentFound = true;
+                }
+            }
+
+            if (!$webspaceDefaultSegmentFound) {
+                throw new WebspaceDefaultSegmentNotFoundException($this->webspace);
+            }
+        }
+    }
+
+    /**
+     * Returns true if there is one default localization.
+     *
+     * @param $localizations
+     *
+     * @return bool
+     *
+     * @throws Exception\InvalidDefaultLocalizationException
+     */
+    private function validateDefaultLocalization($localizations)
+    {
+        $result = false;
+        foreach ($localizations as $localization) {
+            if ($localization->isDefault()) {
+                if ($result) {
+                    throw new InvalidDefaultLocalizationException();
+                }
+                $result = true;
+            }
+        }
+
+        return $result;
     }
 }

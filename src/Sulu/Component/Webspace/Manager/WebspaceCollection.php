@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -11,7 +12,6 @@
 namespace Sulu\Component\Webspace\Manager;
 
 use Sulu\Component\Webspace\Environment;
-use Sulu\Component\Webspace\Localization;
 use Sulu\Component\Webspace\Portal;
 use Sulu\Component\Webspace\PortalInformation;
 use Sulu\Component\Webspace\Webspace;
@@ -19,25 +19,27 @@ use Symfony\Component\Config\Resource\FileResource;
 use Traversable;
 
 /**
- * A collection of all webspaces and portals in a specific sulu installation
- * @package Sulu\Component\Webspace
+ * A collection of all webspaces and portals in a specific sulu installation.
  */
 class WebspaceCollection implements \IteratorAggregate
 {
     /**
-     * All the webspaces in a specific sulu installation
+     * All the webspaces in a specific sulu installation.
+     *
      * @var Webspace[]
      */
     private $webspaces;
 
     /**
-     * All the portals in a specific sulu installation
+     * All the portals in a specific sulu installation.
+     *
      * @var Portal[]
      */
     private $portals;
 
     /**
-     * The portals of this specific sulu installation, prefiltered by the environment and url
+     * The portals of this specific sulu installation, prefiltered by the environment and url.
+     *
      * @var array
      */
     private $portalInformations;
@@ -45,12 +47,14 @@ class WebspaceCollection implements \IteratorAggregate
     /**
      * Contains all the resources, which where used to build this collection.
      * Is required by the Symfony CacheConfig-Component.
+     *
      * @var FileResource[]
      */
     private $resources;
 
     /**
-     * Adds a new FileResource, which is required to determine if the cache is fresh
+     * Adds a new FileResource, which is required to determine if the cache is fresh.
+     *
      * @param FileResource $resource
      */
     public function addResource(FileResource $resource)
@@ -59,7 +63,8 @@ class WebspaceCollection implements \IteratorAggregate
     }
 
     /**
-     * Returns the resources used to build this collection
+     * Returns the resources used to build this collection.
+     *
      * @return array The resources build to use this collection
      */
     public function getResources()
@@ -68,8 +73,10 @@ class WebspaceCollection implements \IteratorAggregate
     }
 
     /**
-     * Returns the portal with the given index
+     * Returns the portal with the given index.
+     *
      * @param $key string The index of the portal
+     *
      * @return Portal
      */
     public function getPortal($key)
@@ -78,18 +85,30 @@ class WebspaceCollection implements \IteratorAggregate
     }
 
     /**
-     * Returns the portal informations for the given environments
+     * Returns the portal informations for the given environment.
+     *
      * @param $environment string The environment to deliver
+     *
+     * @throws \InvalidArgumentException
+     *
      * @return PortalInformation[]
      */
     public function getPortalInformations($environment)
     {
+        if (!isset($this->portalInformations[$environment])) {
+            throw new \InvalidArgumentException(sprintf(
+                'Unknown portal environment "%s"', $environment
+            ));
+        }
+
         return $this->portalInformations[$environment];
     }
 
     /**
-     * Returns the webspace with the given key
+     * Returns the webspace with the given key.
+     *
      * @param $key string The key of the webspace
+     *
      * @return Webspace
      */
     public function getWebspace($key)
@@ -98,7 +117,8 @@ class WebspaceCollection implements \IteratorAggregate
     }
 
     /**
-     * Returns the length of the collection
+     * Returns the length of the collection.
+     *
      * @return int
      */
     public function length()
@@ -108,10 +128,12 @@ class WebspaceCollection implements \IteratorAggregate
 
     /**
      * (PHP 5 &gt;= 5.0.0)<br/>
-     * Retrieve an external iterator
+     * Retrieve an external iterator.
+     *
      * @link http://php.net/manual/en/iteratoraggregate.getiterator.php
+     *
      * @return Traversable An instance of an object implementing <b>Iterator</b> or
-     * <b>Traversable</b>
+     *                     <b>Traversable</b>
      */
     public function getIterator()
     {
@@ -119,197 +141,32 @@ class WebspaceCollection implements \IteratorAggregate
     }
 
     /**
-     * Returns the content of these portals as array
+     * Returns the content of these portals as array.
+     *
      * @return array
      */
     public function toArray()
     {
-        $collection = array();
+        $collection = [];
 
-        $webspaces = array();
+        $webspaces = [];
         foreach ($this->webspaces as $webspace) {
-            $webspaceData = array();
-            $webspaceData['key'] = $webspace->getKey();
-            $webspaceData['name'] = $webspace->getName();
-            $webspaceData['localizations'] = $this->toArrayLocalizations($webspace->getLocalizations());
-
-            $webspaceSecurity = $webspace->getSecurity();
-            if ($webspaceSecurity != null) {
-                $webspaceData['security']['system'] = $webspaceSecurity->getSystem();
-            }
-
-            $webspaceData = $this->toArraySegments($webspace, $webspaceData);
-
-            $webspaceData['portals'] = array();
-
-            $webspaceData['theme']['key'] = $webspace->getTheme()->getKey();
-            $webspaceData['theme']['excludedTemplates'] = $webspace->getTheme()->getExcludedTemplates();
-
-            $webspaceData = $this->toArrayPortals($webspace, $webspaceData);
-            $webspaces[] = $webspaceData;
+            $webspaces[] = $webspace->toArray();
         }
 
-        $portalInformations = array();
+        $portalInformations = [];
         foreach ($this->portalInformations as $environment => $environmentPortalInformations) {
-            $portalInformations[$environment] = $this->toArrayPortalInformations($environmentPortalInformations);
+            $portalInformations[$environment] = [];
+
+            foreach ($environmentPortalInformations as $environmentPortalInformation) {
+                $portalInformations[$environment][$environmentPortalInformation->getUrl()] = $environmentPortalInformation->toArray();
+            }
         }
 
         $collection['webspaces'] = $webspaces;
         $collection['portalInformations'] = $portalInformations;
 
         return $collection;
-    }
-
-    /**
-     * @param $localizations Localization[]
-     * @param bool $withAdditionalOptions
-     * @return array
-     */
-    private function toArrayLocalizations($localizations, $withAdditionalOptions = false)
-    {
-        $localizationsArray = array();
-
-        if (!empty($localizations)) {
-            foreach ($localizations as $localization) {
-                $localizationData = array();
-                $localizationData['country'] = $localization->getCountry();
-                $localizationData['language'] = $localization->getLanguage();
-                $localizationData['localization'] = $localization->getLocalization();
-                $localizationData['default'] = $localization->isDefault();
-
-                if (!$withAdditionalOptions) {
-                    $localizationData['children'] = $this->toArrayLocalizations($localization->getChildren(), true);
-                    $localizationData['shadow'] = $localization->getShadow();
-                }
-
-                $localizationsArray[] = $localizationData;
-            }
-        }
-
-        return $localizationsArray;
-    }
-
-    /**
-     * @param Webspace $webspace
-     * @param array $webspaceData
-     * @return mixed
-     */
-    private function toArraySegments($webspace, $webspaceData)
-    {
-        $segments = $webspace->getSegments();
-        if (!empty($segments)) {
-            foreach ($segments as $segment) {
-                $segmentData = array();
-                $segmentData['key'] = $segment->getKey();
-                $segmentData['name'] = $segment->getName();
-                $segmentData['default'] = $segment->isDefault();
-
-                $webspaceData['segments'][] = $segmentData;
-            }
-
-            return $webspaceData;
-        }
-
-        return $webspaceData;
-    }
-
-    /**
-     * @param Webspace $webspace
-     * @param array $webspaceData
-     * @return mixed
-     */
-    private function toArrayPortals($webspace, $webspaceData)
-    {
-        foreach ($webspace->getPortals() as $portal) {
-            $portalData = array();
-            $portalData['name'] = $portal->getName();
-            $portalData['key'] = $portal->getKey();
-            $portalData['resourceLocator']['strategy'] = $portal->getResourceLocatorStrategy();
-
-            $portalData['localizations'] = $this->toArrayLocalizations($portal->getLocalizations());
-
-            $portalData = $this->toArrayEnvironments($portal, $portalData);
-
-            $webspaceData['portals'][] = $portalData;
-        }
-
-        return $webspaceData;
-    }
-
-    /**
-     * @param Portal $portal
-     * @param array $portalData
-     * @return mixed
-     */
-    private function toArrayEnvironments($portal, $portalData)
-    {
-        foreach ($portal->getEnvironments() as $environment) {
-            $environmentData = array();
-            $environmentData['type'] = $environment->getType();
-
-            $environmentData = $this->toArrayUrls($environment, $environmentData);
-            $portalData['environments'][] = $environmentData;
-        }
-
-        return $portalData;
-    }
-
-    /**
-     * @param Environment $environment
-     * @param array $environmentData
-     * @return mixed
-     */
-    private function toArrayUrls($environment, $environmentData)
-    {
-        foreach ($environment->getUrls() as $url) {
-            $urlData = array();
-            $urlData['url'] = $url->getUrl();
-            $urlData['language'] = $url->getLanguage();
-            $urlData['country'] = $url->getCountry();
-            $urlData['segment'] = $url->getSegment();
-            $urlData['redirect'] = $url->getRedirect();
-
-            $environmentData['urls'][] = $urlData;
-        }
-
-        return $environmentData;
-    }
-
-    /**
-     * @param PortalInformation[] $portalInformations
-     * @param array $portalInformationsData
-     */
-    private function toArrayPortalInformations($portalInformations)
-    {
-        $portalInformationArray = array();
-
-        foreach ($portalInformations as $portalInformation) {
-            $portalInformationData = array();
-            $portalInformationData['type'] = $portalInformation->getType();
-            $portalInformationData['webspace'] = $portalInformation->getWebspace()->getKey();
-            $portalInformationData['url'] = $portalInformation->getUrl();
-
-            $portal = $portalInformation->getPortal();
-            if ($portal) {
-                $portalInformationData['portal'] = $portal->getKey();
-            }
-
-            $localization = $portalInformation->getLocalization();
-            if ($localization) {
-                $portalInformationData['localization'] = $localization->getLocalization();
-            }
-
-            $portalInformationData['redirect'] = $portalInformation->getRedirect();
-
-            $segment = $portalInformation->getSegment();
-            if ($segment) {
-                $portalInformationData['segment'] = $segment->getKey();
-            }
-
-            $portalInformationArray[$portalInformationData['url']] = $portalInformationData;
-        }
-
-        return $portalInformationArray;
     }
 
     /**
@@ -329,8 +186,9 @@ class WebspaceCollection implements \IteratorAggregate
     }
 
     /**
-     * Returns all the portals of this collection
-     * @return array|Portal[]
+     * Returns all the portals of this collection.
+     *
+     * @return Portal[]
      */
     public function getPortals()
     {
@@ -338,7 +196,8 @@ class WebspaceCollection implements \IteratorAggregate
     }
 
     /**
-     * Sets the portals for this collection
+     * Sets the portals for this collection.
+     *
      * @param Portal[] $portals
      */
     public function setPortals($portals)
@@ -347,7 +206,8 @@ class WebspaceCollection implements \IteratorAggregate
     }
 
     /**
-     * Sets the portal Information for this collection
+     * Sets the portal Information for this collection.
+     *
      * @param array $portalInformations
      */
     public function setPortalInformations($portalInformations)

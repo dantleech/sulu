@@ -6,26 +6,41 @@
         <parameter key="sulu_core.webspace.webspace_manager.class">Sulu\Component\Webspace\Manager\WebspaceManager</parameter>
         <parameter key="sulu_core.webspace.loader.xml_class">Sulu\Component\Webspace\Loader\XmlFileLoader</parameter>
 
-        <parameter key="sulu_core.webspace.config_dir">%kernel.root_dir%/../Resources/webspaces</parameter>
         <parameter key="sulu_core.webspace.cache_class">WebspaceCollectionCache</parameter>
         <parameter key="sulu_core.webspace.base_class">WebspaceCollection</parameter>
+        <parameter key="sulu_core.webspace.document_manager.webspace_initializer.class">Sulu\Component\Webspace\Document\Initializer\WebspaceInitializer</parameter>
     </parameters>
 
     <services>
         <service id="sulu_core.webspace.loader.xml" class="%sulu_core.webspace.loader.xml_class%">
             <argument type="service" id="file_locator"/>
         </service>
+
         <service id="sulu_core.webspace.webspace_manager" class="%sulu_core.webspace.webspace_manager.class%">
+            <tag name="sulu.localization_provider"/>
             <!-- TODO use delegating loader -->
             <argument type="service" id="sulu_core.webspace.loader.xml"/>
             <argument type="service" id="logger"/>
             <argument type="collection">
                 <argument key="config_dir">%sulu_core.webspace.config_dir%</argument>
-                <argument key="cache_dir">%kernel.cache_dir%</argument>
+                <argument key="cache_dir">%sulu.cache_dir%</argument>
                 <argument key="debug">%kernel.debug%</argument>
                 <argument key="cache_class">%sulu_core.webspace.cache_class%</argument>
                 <argument key="base_class">%sulu_core.webspace.base_class%</argument>
             </argument>
+        </service>
+
+        <service id="sulu_core.webspace.document_manager.webspace_initializer" class="%sulu_core.webspace.document_manager.webspace_initializer.class%">
+            <argument type="service" id="sulu_core.webspace.webspace_manager" />
+            <argument type="service" id="sulu_document_manager.document_manager" />
+            <argument type="service" id="sulu_document_manager.document_inspector" />
+            <argument type="service" id="sulu_document_manager.path_builder" />
+            <argument type="service" id="sulu_document_manager.node_manager" />
+            <tag name="sulu_document_manager.initializer" priority="0" />
+        </service>
+
+        <service id="sulu_core.webspace.settings_manager" class="Sulu\Component\Webspace\Settings\SettingsManager">
+            <argument type="service" id="sulu.phpcr.session"/>
         </service>
     </services>
 </container>

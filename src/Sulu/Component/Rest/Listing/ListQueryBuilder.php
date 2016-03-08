@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -11,38 +12,43 @@
 namespace Sulu\Component\Rest\Listing;
 
 /**
- * Class ListQueryBuilder
- * @package Sulu\Component\Rest\Listing
+ * Class ListQueryBuilder.
+ *
  * @deprecated
  */
 class ListQueryBuilder
 {
     /**
-     * List of all table aliases
+     * List of all table aliases.
+     *
      * @var array
      */
     private $prefixes;
 
     /**
-     * Contains the join part of the dql
+     * Contains the join part of the dql.
+     *
      * @var string
      */
     private $joins;
 
     /**
-     * Contains the select part of the dql
+     * Contains the select part of the dql.
+     *
      * @var string
      */
     private $select;
 
     /**
-     * Containing the fields which should be shown in the result
+     * Containing the fields which should be shown in the result.
+     *
      * @var array
      */
-    private $fields = array();
+    private $fields = [];
 
     /**
-     * The array representation of the sortings
+     * The array representation of the sortings.
+     *
      * @var array
      */
     private $sorting;
@@ -50,69 +56,80 @@ class ListQueryBuilder
     /**
      * Contains all the where clauses.
      * The keys are the field names and the content is the value to filter for.
+     *
      * @var array
      */
     private $where;
 
     /**
-     * The name of the root entity
+     * The name of the root entity.
+     *
      * @var string
      */
     private $entityName;
 
     /**
-     * The names of the relations of the root entity
+     * The names of the relations of the root entity.
+     *
      * @var array
      */
     private $associationNames;
 
     /**
-     * cache variable for replacing select string in some cases
+     * cache variable for replacing select string in some cases.
+     *
      * @var string
      */
     private $replaceSelect;
 
     /**
-     * defines if query is used for counting
+     * defines if query is used for counting.
+     *
      * @var bool
      */
     private $countQuery;
 
     /**
-     * The names of columns of the root entity
+     * The names of columns of the root entity.
+     *
      * @var array
      */
     private $fieldNames;
 
     /**
-     * contains all fieldnames that are searched
+     * contains all fieldnames that are searched.
+     *
      * @var array
      */
     private $searchFields;
 
     /**
-     * contains searched fieldnames that can be queried by LIKE
+     * contains searched fieldnames that can be queried by LIKE.
+     *
      * @var array
      */
     private $searchTextFields;
 
     /**
-     * contains searched fieldnames that are numeric
+     * contains searched fieldnames that are numeric.
+     *
      * @var array
      */
     private $searchNumberFields;
 
     /**
-     * used as a storage for saving relational fields
-     * @var $relationalFilters
+     * used as a storage for saving relational fields.
+     *
+     * @var
      */
-    private $relationalFilters = array();
+    private $relationalFilters = [];
 
     /**
-     * contains all join conditions
-     * @var $relationalFilters
+     * contains all join conditions.
+     *
+     * @var
      */
-    private $joinConditions = array();
+    private $joinConditions = [];
 
     /**
      * @param $associationNames
@@ -123,24 +140,23 @@ class ListQueryBuilder
      * @param $where
      * @param array $searchTextFields
      * @param array $searchNumberFields
-     * @param array $joinConditions - specify a custom join condition
+     * @param array $joinConditions     - specify a custom join condition
      */
-    function __construct(
+    public function __construct(
         $associationNames,
         $fieldNames,
         $entityName,
         $fields,
         $sorting,
         $where,
-        $searchTextFields = array(),
-        $searchNumberFields = array(),
-        $joinConditions = array()
-    )
-    {
+        $searchTextFields = [],
+        $searchNumberFields = [],
+        $joinConditions = []
+    ) {
         $this->associationNames = $associationNames;
         $this->fieldNames = $fieldNames;
         $this->entityName = $entityName;
-        $this->fields = (is_array($fields)) ? $fields : array();
+        $this->fields = (is_array($fields)) ? $fields : [];
         $this->sorting = $sorting;
         $this->where = $where;
         $this->searchFields = array_merge($searchTextFields, $searchNumberFields);
@@ -150,9 +166,10 @@ class ListQueryBuilder
     }
 
     /**
-     * Searches Entity by filter for fields, pagination and sorted by a column
+     * Searches Entity by filter for fields, pagination and sorted by a column.
      *
      * @param string $prefix Prefix for starting Table
+     *
      * @return string
      */
     public function find($prefix = 'u')
@@ -170,7 +187,7 @@ class ListQueryBuilder
     }
 
     /**
-     * just return count
+     * just return count.
      */
     public function justCount($countAttribute = 'u.id', $alias = 'totalcount')
     {
@@ -179,25 +196,26 @@ class ListQueryBuilder
     }
 
     /**
-     * Create a Select ... From ... Statement for given fields with joins
+     * Create a Select ... From ... Statement for given fields with joins.
      *
      * @param string $prefix
+     *
      * @return string
      */
     private function getSelectFrom($prefix = 'u')
     {
         $this->joins = '';
-        $this->prefixes = array($prefix);
+        $this->prefixes = [$prefix];
 
         // select and where fields
         $fieldsWhere = array_merge(
-            ($this->fields != null) ? $this->fields : array(),
+            ($this->fields != null) ? $this->fields : [],
             array_keys($this->where)
         );
 
         $fieldsWhere = array_merge($fieldsWhere, $this->searchTextFields, $this->searchNumberFields);
 
-        if ($fieldsWhere != null && sizeof($fieldsWhere) >= 0) {
+        if ($fieldsWhere != null && count($fieldsWhere) >= 0) {
             foreach ($fieldsWhere as $field) {
                 $this->performSelectFromField($field, $prefix);
             }
@@ -217,7 +235,7 @@ class ListQueryBuilder
     }
 
     /**
-     * solves the relations for a single field and generate dql for select and joins
+     * solves the relations for a single field and generate dql for select and joins.
      *
      * @param string $field
      * @param string $prefix
@@ -237,11 +255,11 @@ class ListQueryBuilder
         }
 
         // If field is delimited and is a Relation
-        if (sizeof($fieldParts) >= 2 && $this->isRelation($fieldParts[0])) {
+        if (count($fieldParts) >= 2 && $this->isRelation($fieldParts[0])) {
             $this->joins .= $this->generateJoins($fieldParts, $prefix);
             if (in_array($field, $this->fields)) {
                 // last element is column name and next-to-last is the associationPrefix
-                $i = sizeof($fieldParts) - 1;
+                $i = count($fieldParts) - 1;
 
                 // {associationPrefix}.{columnName} {alias}
                 $parent = $fieldParts[$i - 1];
@@ -256,7 +274,8 @@ class ListQueryBuilder
     }
 
     /**
-     * Add {prefix}.{field} {alias} to select string
+     * Add {prefix}.{field} {alias} to select string.
+     *
      * @param string $prefix
      * @param string $field
      * @param string $alias
@@ -270,11 +289,12 @@ class ListQueryBuilder
     }
 
     /**
-     * Generate {prefix}.{field} {alias}
+     * Generate {prefix}.{field} {alias}.
      *
      * @param string $prefix
      * @param string $field
      * @param string $alias
+     *
      * @return string
      */
     private function generateSelect($prefix, $field, $alias = '')
@@ -285,17 +305,18 @@ class ListQueryBuilder
     }
 
     /**
-     * Generate JOIN {parent}.{fieldname} {alias} foreach fieldPart
+     * Generate JOIN {parent}.{fieldname} {alias} foreach fieldPart.
      *
-     * @param array $fieldParts
+     * @param array  $fieldParts
      * @param string $prefix
+     *
      * @return string
      */
     private function generateJoins($fieldParts, $prefix)
     {
         $i = 0;
         $result = '';
-        while ($i <= sizeof($fieldParts) - 2) {
+        while ($i <= count($fieldParts) - 2) {
             if (!in_array($fieldParts[$i], $this->prefixes)) {
                 $result .= $this->generateJoin(
                     ($i == 0) ? $prefix : $fieldParts[$i - 1],
@@ -304,18 +325,19 @@ class ListQueryBuilder
                 );
                 $this->prefixes[] = $fieldParts[$i];
             }
-            $i++;
+            ++$i;
         }
 
         return $result;
     }
 
     /**
-     * Generate JOIN {parent}.{fieldname} {alias}
+     * Generate JOIN {parent}.{fieldname} {alias}.
      *
      * @param string $parent
      * @param string $field
      * @param string $alias
+     *
      * @return string
      */
     private function generateJoin($parent, $field, $alias)
@@ -328,8 +350,10 @@ class ListQueryBuilder
     }
 
     /**
-     * generates the join condition
+     * generates the join condition.
+     *
      * @param $field
+     *
      * @return string
      */
     private function generateJoinCondition($field)
@@ -345,9 +369,10 @@ class ListQueryBuilder
     }
 
     /**
-     * Check if Field is an Association
+     * Check if Field is an Association.
      *
      * @param string $field
+     *
      * @return bool
      */
     private function isRelation($field)
@@ -356,18 +381,19 @@ class ListQueryBuilder
     }
 
     /**
-     * Get DQL for Where clause
+     * Get DQL for Where clause.
      *
      * @param string $prefix
+     *
      * @return string
      */
     private function getWhere($prefix)
     {
         $result = '';
         // Only return where clause if there actually is some data
-        if (sizeof($this->where) > 0 || sizeof($this->searchFields) > 0) {
-            $wheres = array();
-            $searches = array();
+        if (count($this->where) > 0 || count($this->searchFields) > 0) {
+            $wheres = [];
+            $searches = [];
 
             $whereKeys = array_keys($this->where);
 
@@ -379,10 +405,10 @@ class ListQueryBuilder
             foreach ($fields as $key) {
                 $keys = explode('_', $key);
                 $prefixActual = $prefix;
-                if (sizeof($keys) == 1) {
+                if (count($keys) == 1) {
                     $col = $keys[0];
                 } else {
-                    $i = sizeof($keys);
+                    $i = count($keys);
                     $prefixActual = $keys[$i - 2];
                     $col = $keys[$i - 1];
                 }
@@ -423,16 +449,17 @@ class ListQueryBuilder
     }
 
     /**
-     * Get DQL for Sorting
+     * Get DQL for Sorting.
      *
      * @param string $prefix
+     *
      * @return string
      */
     private function getOrderBy($prefix)
     {
         $result = '';
         // If sorting is defined
-        if ($this->sorting != null && sizeof($this->sorting) > 0) {
+        if ($this->sorting != null && count($this->sorting) > 0) {
             $orderBy = '';
             // TODO OrderBy relations translations_value
             foreach ($this->sorting as $col => $dir) {

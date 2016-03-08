@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -21,13 +22,13 @@ use Symfony\Component\HttpFoundation\Request;
  *
  * For lists it allocates a Repository
  *
- * @package Sulu\Bundle\TranslateBundle\Controller
  * @deprecated
  */
 class ListRestHelper
 {
     /**
-     * The current request object
+     * The current request object.
+     *
      * @var Request
      */
     protected $request;
@@ -38,29 +39,17 @@ class ListRestHelper
     protected $em;
 
     /**
-     * temp property for saving total amount of entities
+     * temp property for saving total amount of entities.
+     *
      * @var int
      */
     private $totalNumberOfElements;
 
     /**
-     * url parameter naming
-     * @var array
-     */
-    protected $parameterNames = array(
-        'sortBy' => 'sortBy',
-        'sortOrder' => 'sortOrder',
-        'pageSize' => 'pageSize',
-        'page' => 'page',
-        'search' => 'search',
-        'searchFields' => 'searchFields',
-        'fields' => 'fields',
-    );
-
-    /**
      * The constructor takes the request as an argument, which
-     * is injected by the service container
-     * @param Request $request
+     * is injected by the service container.
+     *
+     * @param Request       $request
      * @param ObjectManager $em
      */
     public function __construct(Request $request, ObjectManager $em)
@@ -70,8 +59,10 @@ class ListRestHelper
     }
 
     /**
-     * Create a ListRepository for given EntityName
+     * Create a ListRepository for given EntityName.
+     *
      * @param string $entityName
+     *
      * @return ListRepository
      */
     public function getRepository($entityName)
@@ -80,19 +71,22 @@ class ListRestHelper
     }
 
     /**
-     * Create a ListRepository for given EntityName and find Entities for list
+     * Create a ListRepository for given EntityName and find Entities for list.
+     *
      * @param string $entityName
-     * @param array $where
-     * @param array $joinConditions
+     * @param array  $where
+     * @param array  $joinConditions
+     *
      * @return array
      */
-    public function find($entityName, $where = array(), $joinConditions = array())
+    public function find($entityName, $where = [], $joinConditions = [])
     {
         return $this->getRepository($entityName)->find($where, 'u', false, $joinConditions);
     }
 
     /**
-     * Returns the current Request
+     * Returns the current Request.
+     *
      * @return Request
      */
     protected function getRequest()
@@ -101,51 +95,57 @@ class ListRestHelper
     }
 
     /**
-     * Returns an array containing the desired sorting
+     * Returns an array containing the desired sorting.
+     *
      * @return array
      */
     public function getSorting()
     {
-        $sortOrder = $this->getRequest()->get($this->getParameterName('sortOrder'), 'asc');
-        $sortBy = $this->getRequest()->get($this->getParameterName('sortBy'), 'id');
+        $sortOrder = $this->getRequest()->get('sortOrder', 'asc');
+        $sortBy = $this->getRequest()->get('sortBy', 'id');
 
-        return array($sortBy => $sortOrder);
+        return [$sortBy => $sortOrder];
     }
 
     /**
-     * Returns the maximum number of elements in a single response
-     * @return integer
+     * Returns the maximum number of elements in a single response.
+     *
+     * @return int
      */
     public function getLimit()
     {
-        return $this->getRequest()->get($this->getParameterName('pageSize'));
+        return $this->getRequest()->get('limit');
     }
 
     /**
      * Returns the calculated value for the starting position based
-     * on the page and pagesize values
-     * @return integer|null
+     * on the page and limit values.
+     *
+     * @return int|null
      */
     public function getOffset()
     {
-        $page = $this->getRequest()->get($this->getParameterName('page'), 1);
-        $pageSize = $this->getRequest()->get($this->getParameterName('pageSize'));
+        $page = $this->getRequest()->get('page', 1);
+        $limit = $this->getRequest()->get('limit');
 
-        return ($pageSize != null) ? $pageSize * ($page - 1) : null;
+        return ($limit != null) ? $limit * ($page - 1) : null;
     }
 
     /**
-     * returns the current page
+     * returns the current page.
+     *
      * @return mixed
      */
     public function getPage()
     {
-        return $this->getRequest()->get($this->getParameterName('page'), 1);
+        return $this->getRequest()->get('page', 1);
     }
 
     /**
-     * returns total amount of pages
+     * returns total amount of pages.
+     *
      * @param int $totalNumber if not defined the total number is requested from DB
+     *
      * @return float|int
      */
     public function getTotalPages($totalNumber = null)
@@ -153,12 +153,15 @@ class ListRestHelper
         if (is_null($totalNumber)) {
             $totalNumber = $this->$totalNumberOfElements;
         }
+
         return $this->getLimit() ? (ceil($totalNumber / $this->getLimit())) : 1;
     }
 
     /**
-     * returns all field names for a certain entity
+     * returns all field names for a certain entity.
+     *
      * @param $entityName
+     *
      * @return array
      */
     public function getAllFields($entityName)
@@ -169,56 +172,49 @@ class ListRestHelper
     /**
      * Returns an array with all the fields, which should be contained in the response.
      * If null is returned every field should be contained.
+     *
      * @return array|null
      */
     public function getFields()
     {
-        $fields = $this->getRequest()->get($this->getParameterName('fields'));
+        $fields = $this->getRequest()->get('fields');
+
         return ($fields != null) ? explode(',', $fields) : null;
     }
 
     /**
-     * Returns the pattern of the search
+     * Returns the pattern of the search.
+     *
      * @return mixed
      */
     public function getSearchPattern()
     {
-        return $this->getRequest()->get($this->getParameterName('search'));
+        return $this->getRequest()->get('search');
     }
 
     /**
-     * Returns an array with all the fields the search pattern should be executed on
+     * Returns an array with all the fields the search pattern should be executed on.
+     *
      * @return array|null
      */
     public function getSearchFields()
     {
-        $searchFields = $this->getRequest()->get($this->getParameterName('searchFields'));
+        $searchFields = $this->getRequest()->get('searchFields');
 
-        return ($searchFields != null) ? explode(',', $searchFields) : array();
+        return ($searchFields != null) ? explode(',', $searchFields) : [];
     }
 
     /**
      * @param $entityName
      * @param $where
      * @param array $joinConditions
+     *
      * @return int
      */
-    public function getTotalNumberOfElements($entityName, $where, $joinConditions = array())
+    public function getTotalNumberOfElements($entityName, $where, $joinConditions = [])
     {
         $this->totalNumberOfElements = $this->getRepository($entityName)->getCount($where, $joinConditions);
-        return $this->totalNumberOfElements;
-    }
 
-    /**
-     * returns parameter
-     * @param $key
-     * @return string|null
-     */
-    public function getParameterName($key)
-    {
-        if (array_key_exists($key, $this->parameterNames)) {
-            return $this->parameterNames[$key];
-        }
-        return null;
+        return $this->totalNumberOfElements;
     }
 }

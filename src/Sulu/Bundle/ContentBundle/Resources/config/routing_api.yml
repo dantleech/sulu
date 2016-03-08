@@ -1,0 +1,24 @@
+sulu_content.rl:
+    type: rest
+    resource: Sulu\Bundle\ContentBundle\Controller\NodeResourcelocatorController
+
+sulu_content.node:
+    type: rest
+    resource: Sulu\Bundle\ContentBundle\Controller\NodeController
+
+sulu_content.node.seo:
+    type: rest
+    parent: sulu_content.node
+    resource: Sulu\Bundle\ContentBundle\Controller\SeoController
+
+sulu_content.webspace.localization:
+    type: rest
+    resource: Sulu\Bundle\ContentBundle\Controller\WebspaceLocalizationController
+
+sulu_content.smart_content:
+    type: rest
+    resource: Sulu\Bundle\ContentBundle\Controller\SmartContentItemController
+
+sulu_content.webspace:
+    type: rest
+    resource: Sulu\Bundle\ContentBundle\Controller\WebspaceController

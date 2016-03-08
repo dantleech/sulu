@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -10,17 +11,10 @@
 
 namespace Sulu\Component\PHPCR\SessionManager;
 
-
-use PHPCR\CredentialsInterface;
-use PHPCR\NodeInterface;
-use PHPCR\RepositoryFactoryInterface;
-use PHPCR\RepositoryInterface;
 use PHPCR\SessionInterface;
-use PHPCR\SimpleCredentials;
 
 class SessionManager implements SessionManagerInterface
 {
-
     /**
      * @var string[]
      */
@@ -31,15 +25,14 @@ class SessionManager implements SessionManagerInterface
      */
     private $session;
 
-    function __construct(SessionInterface $session, $nodeNames)
+    public function __construct(SessionInterface $session, $nodeNames)
     {
         $this->session = $session;
         $this->nodeNames = $nodeNames;
     }
 
     /**
-     * returns a valid session to interact with a phpcr database
-     * @return SessionInterface
+     * {@inheritdoc}
      */
     public function getSession()
     {
@@ -47,37 +40,91 @@ class SessionManager implements SessionManagerInterface
     }
 
     /**
-     * returns the route node for given webspace
-     * @param string $webspaceKey
-     * @param string $languageCode
-     * @param string $segment
-     * @return NodeInterface
+     * {@inheritdoc}
      */
     public function getRouteNode($webspaceKey, $languageCode, $segment = null)
     {
+        return $this->getSession()->getNode($this->getRoutePath($webspaceKey, $languageCode, $segment));
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getRoutePath($webspaceKey, $languageCode, $segment = null)
+    {
         $path = sprintf(
-            '%s/%s/%s/%s%s',
+            '/%s/%s/%s/%s%s',
             $this->nodeNames['base'],
             $webspaceKey,
             $this->nodeNames['route'],
             $languageCode,
             ($segment !== null ? '/' . $segment : '')
         );
-        $root = $this->getSession()->getRootNode();
 
-        return $root->getNode($path);
+        return $path;
     }
 
     /**
-     * returns the content node for given webspace
-     * @param string $webspaceKey
-     * @return NodeInterface
+     * {@inheritdoc}
      */
     public function getContentNode($webspaceKey)
     {
-        $path = $this->nodeNames['base'] . '/' . $webspaceKey . '/' . $this->nodeNames['content'];
-        $root = $this->getSession()->getRootNode();
+        return $this->getSession()->getNode($this->getContentPath($webspaceKey));
+    }
 
-        return $root->getNode($path);
+    /**
+     * {@inheritdoc}
+     */
+    public function getContentPath($webspaceKey)
+    {
+        $path = sprintf(
+            '/%s/%s/%s',
+            $this->nodeNames['base'],
+            $webspaceKey,
+            $this->nodeNames['content']
+        );
+
+        return $path;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getWebspaceNode($webspaceKey)
+    {
+        return $this->getSession()->getNode($this->getWebspacePath($webspaceKey));
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getWebspacePath($webspaceKey)
+    {
+        return sprintf(
+            '/%s/%s',
+            $this->nodeNames['base'],
+            $webspaceKey
+        );
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getSnippetNode($templateKey = null)
+    {
+        $snippetPath = '/' . $this->nodeNames['base'] . '/' . $this->nodeNames['snippet'];
+        $nodePath = $snippetPath . '/' . $templateKey;
+
+        if (null === $templateKey) {
+            $nodePath = $snippetPath;
+        }
+
+        try {
+            $node = $this->getSession()->getNode($nodePath);
+        } catch (\PHPCR\PathNotFoundException $e) {
+            $node = $this->getSession()->getNode($snippetPath)->addNode($templateKey);
+        }
+
+        return $node;
     }
 }

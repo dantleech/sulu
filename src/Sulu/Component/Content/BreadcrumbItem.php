@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -11,30 +12,34 @@
 namespace Sulu\Component\Content;
 
 /**
- * Item for breadcrumb
- * @package Sulu\Component\Content
+ * Item for breadcrumb.
+ *
+ * @deprecated This class was only used for an array generation, which is now done in a serializer subscriber
  */
 class BreadcrumbItem implements BreadcrumbItemInterface
 {
     /**
-     * depth of node
+     * depth of node.
+     *
      * @var int
      */
     private $depth;
 
     /**
-     * title of node
+     * title of node.
+     *
      * @var string
      */
     private $title;
 
     /**
-     * uuid of node
+     * uuid of node.
+     *
      * @var string
      */
     private $uuid;
 
-    function __construct($depth, $uuid, $title)
+    public function __construct($depth, $uuid, $title)
     {
         $this->depth = $depth;
         $this->title = $title;
@@ -42,7 +47,8 @@ class BreadcrumbItem implements BreadcrumbItemInterface
     }
 
     /**
-     * returns depth of node
+     * returns depth of node.
+     *
      * @return int
      */
     public function getDepth()
@@ -51,7 +57,8 @@ class BreadcrumbItem implements BreadcrumbItemInterface
     }
 
     /**
-     * returns title of node
+     * returns title of node.
+     *
      * @return string
      */
     public function getTitle()
@@ -60,7 +67,8 @@ class BreadcrumbItem implements BreadcrumbItemInterface
     }
 
     /**
-     * returns uuid of node
+     * returns uuid of node.
+     *
      * @return string
      */
     public function getUuid()
@@ -69,15 +77,16 @@ class BreadcrumbItem implements BreadcrumbItemInterface
     }
 
     /**
-     * returns array representation
+     * returns array representation.
+     *
      * @return array
      */
     public function toArray()
     {
-        return array(
+        return [
             'uuid' => $this->getUuid(),
             'depth' => $this->getDepth(),
-            'title' => $this->getTitle()
-        );
+            'title' => $this->getTitle(),
+        ];
     }
 }

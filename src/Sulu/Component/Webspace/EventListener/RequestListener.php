@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -14,8 +15,7 @@ use Sulu\Component\Webspace\Analyzer\RequestAnalyzerInterface;
 use Symfony\Component\HttpKernel\Event\GetResponseEvent;
 
 /**
- * This listener sets the current portal on the portal manager
- * @package Sulu\Bundle\CoreBundle\EventListener
+ * This listener sets the current portal on the portal manager.
  */
 class RequestListener
 {
@@ -31,6 +31,8 @@ class RequestListener
 
     public function onKernelRequest(GetResponseEvent $event)
     {
-        $this->requestAnalyzer->analyze($event->getRequest());
+        if ($event->isMasterRequest()) {
+            $this->requestAnalyzer->analyze($event->getRequest());
+        }
     }
 }

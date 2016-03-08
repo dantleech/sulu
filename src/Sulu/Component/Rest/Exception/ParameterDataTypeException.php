@@ -1,6 +1,7 @@
 <?php
+
 /*
- * This file is part of the Sulu CMS.
+ * This file is part of Sulu.
  *
  * (c) MASSIVE ART WebServices GmbH
  *
@@ -11,7 +12,7 @@
 namespace Sulu\Component\Rest\Exception;
 
 /**
- * parameter wrong datatype
+ * parameter wrong datatype.
  */
 class ParameterDataTypeException extends RestException
 {
@@ -24,7 +25,7 @@ class ParameterDataTypeException extends RestException
      */
     private $controller;
 
-    function __construct($controller, $name)
+    public function __construct($controller, $name)
     {
         parent::__construct(sprintf('Parameter %s has wrong data type in %s', $name, $controller), 0);
         $this->controller = $controller;
