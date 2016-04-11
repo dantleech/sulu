@@ -70,6 +70,7 @@ class WebspaceInitializer implements InitializerInterface
     public function initialize(OutputInterface $output)
     {
         $webspaces = $this->webspaceManager->getWebspaceCollection();
+
         foreach ($webspaces as $webspace) {
             $this->initializeWebspace($output, $webspace);
         }
