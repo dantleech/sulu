@@ -24,9 +24,7 @@ use Sulu\Component\DocumentManager\DocumentManagerRegistryInterface;
  * The synchronization manager handles the synchronization of documents
  * from the DEFAULT document manger to the PUBLISH document manager.
  *
- * NOTE: In the future multiple document managers may be supported.
- *
- * TODO: Explcitly inject publish and default document managers?
+ * NOTE: In the future multiple publish document managers may be supported.
  */
 class SynchronizationManager
 {
@@ -50,15 +48,22 @@ class SynchronizationManager
      */
     private $registrator;
 
+    /**
+     * @var array
+     */
+    private $cascadeMap;
+
     public function __construct(
         DocumentManagerRegistry $registry,
         PropertyEncoder $encoder,
         $publishManagerName,
+        array $cascadeMap = [],
         $registrator = null
     ) {
         $this->registry = $registry;
         $this->publishManagerName = $publishManagerName;
         $this->encoder = $encoder;
+        $this->cascadeMap = $cascadeMap;
         $this->registrator = $registrator ?: new DocumentRegistrator(
             $registry->getManager(),
             $registry->getManager($this->publishManagerName)
@@ -83,70 +88,39 @@ class SynchronizationManager
     }
 
     /**
-     * Synchronize a document and any other documents which are
-     * associated with it and should also be published.
-     *
-     * All document managers involved will be FLUSHED after
-     * the operation has completed.
-     *
-     * @param SynchronizeBehavior $document
-     */
-    public function synchronizeFull(SynchronizeBehavior $document, array $options = [])
-    {
-        // get the default managerj
-        $defaultManager = $this->registry->getManager();
-        $publishManager = $this->getPublishDocumentManager();
-
-        // if the  emitting manager is the publish manager, stop we
-        // don't want to sync from the publish workspace!
-        if ($publishManager === $defaultManager) {
-            return;
-        }
-
-        // Get the routes for the document if it implements
-        // the "resource segment subscriber".
-        //
-        // TODO: We should instead add configuration to cascade certain
-        //       document classes instead of hard coding this logic.
-        $routes = [];
-        if ($document instanceof ResourceSegmentBehavior) {
-            $routes = $this->getDocumentRoutes($defaultManager->getInspector(), $document);
-        }
-
-        $toSynchronize = array_merge([
-            $document,
-        ], $routes);
-
-        foreach ($toSynchronize as $syncDocument) {
-            $this->synchronizeSingle($syncDocument, $options);
-        }
-
-        $publishManager->flush();
-        $defaultManager->flush();
-    }
-
-    /**
      * Synchronize a single document to the publish document manager in the
      * documents currently registered locale.
      *
      * FLUSH will not be called and no associated documents will be
      * synchronized.
      *
+     * Options:
+     *
+     * - `force`  : Force the synchronization, do not skip if the system thinks
+     *              the target document is already synchronized.
+     * - `cascade`: Cascade the synchronization to any configured relations.
+     * - `flush`  : Flush both document managers after synchronization (as the calling
+     *              code may not have access to them).
+     *
      * TODO: Add an explicit "locale" option?
      *
      * @param SynchronizeBehavior $document
      * @param bool $force
      */
-    public function synchronizeSingle(SynchronizeBehavior $document, array $options = [])
+    public function synchronize(SynchronizeBehavior $document, array $options = [])
     {
         $options = array_merge([
             'force' => false,
+            'cascade' => false,
+            'flush' => false,
         ], $options);
 
         $defaultManager = $this->registry->getManager();
         $publishManager = $this->getPublishDocumentManager();
 
-        // see comment in same condition above.
+        // if the publish manager and default manager are the same, then there is nothing to do here.
+        // NOTE: Should we throw an exception here? as we will introduce the ability to completely disable
+        //       this feature.
         if ($publishManager === $defaultManager) {
             return;
         }
@@ -180,6 +154,10 @@ class SynchronizationManager
         );
         // the document is now synchronized with the publish workspace...
 
+        if ($options['cascade']) {
+            $this->cascadeRelations($document, $options);
+        }
+
         // add the document manager name to the list of synchronized
         // document managers directly on the PHPCR node.
         //
@@ -192,6 +170,11 @@ class SynchronizationManager
         //       currently a heavy operation due to the content system and lack of a
         //       UOW.
         $synced[] = $this->publishManagerName;
+
+        // only store unique values: if the sync was forced, then the document
+        // may already have the target manager name in its list of synched
+        // managers.
+        $synced = array_unique($synced);
         $node = $inspector->getNode($document);
 
         if ($document instanceof LocaleBehavior) {
@@ -200,36 +183,71 @@ class SynchronizationManager
                     SynchronizeBehavior::SYNCED_FIELD,
                     $inspector->getLocale($document)
                 ),
-                array_unique($synced)
+                $synced
             );
         } else {
             $node->setProperty(
                 $this->encoder->systemName(
                     SynchronizeBehavior::SYNCED_FIELD
                 ),
-                array_unique($synced)
+                $synced
             );
+        }
+
+        // TODO: use the metadata to set this field? 
+        //       yes: there is a method to do this ($metadata->setFieldValue)
+        $reflection = new \ReflectionClass(get_class($document));
+        $property = $reflection->getProperty(
+            'synchronizedManagers'
+        );
+        $property->setAccessible(true);
+        $property->setValue($document, $synced);
+
+        if ($options['flush']) {
+            $defaultManager->flush();
+            $publishManager->flush();
         }
     }
 
-    /**
-     * Return routes related to the document.
-     *
-     * @param DocumentInspector
-     * @param ResourceSegmentBehavior $document
-     */
-    private function getDocumentRoutes(DocumentInspector $inspector, ResourceSegmentBehavior $document)
+    private function cascadeRelations($document, array $options)
     {
-        $referrers = $inspector->getReferrers($document);
-        $routes = [];
-
-        foreach ($referrers as $referrer) {
-            if (!$referrer instanceof RouteDocument) {
+        $cascadeFqns = [];
+        foreach ($this->cascadeMap as $classFqn => $targetFqns) {
+            if (false === $this->isInstanceOf($classFqn, $document)) {
                 continue;
             }
-            $routes[] = $referrer;
+
+            $cascadeFqns = $targetFqns;
+            break;
         }
 
-        return $routes;
+        if (empty($cascadeFqns)) {
+            return;
+        }
+
+        $referrers = $this->registry->getManager()->getInspector()->getReferrers($document);
+        foreach ($referrers as $referrer) {
+            foreach ($cascadeFqns as $cascadeFqn) {
+                // if the referrer does not an instance of the mapped cascade
+                // class, continue.
+                if (false === $this->isInstanceOf($cascadeFqn, $referrer)) {
+                    continue;
+                }
+
+                $options['flush'] = false;
+                $this->synchronize($referrer, $options);
+            }
+        }
+    }
+
+    private function isInstanceOf($classFqn, $document)
+    {
+        if (get_class($document) === $classFqn) {
+            return true;
+        }
+
+        $reflection = new \ReflectionClass(get_class($document));
+
+        return $reflection->isSubclassOf($classFqn);
     }
 }

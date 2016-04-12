@@ -79,6 +79,7 @@ class WebspaceInitializer implements InitializerInterface
 
     private function initializeWebspace(OutputInterface $output, Webspace $webspace)
     {
+        $output->writeln(sprintf('  <info>%s</>', $webspace->getName()));
         $homePath = $this->pathBuilder->build(['%base%', $webspace->getKey(), '%content%']);
         $routesPath = $this->pathBuilder->build(['%base%', $webspace->getKey(), '%route%']);
 
@@ -105,7 +106,7 @@ class WebspaceInitializer implements InitializerInterface
 
         foreach ($webspaceLocales as $webspaceLocale) {
             if (in_array($webspaceLocale, $existingLocales)) {
-                $output->writeln(sprintf('  [ ] <info>homepage</info>: %s (%s)', $homePath, $webspaceLocale));
+                $output->writeln(sprintf('  [ ] <info>homepage</info>: [%s] %s (%s)', $homeType, $homePath, $webspaceLocale));
                 continue;
             }
 

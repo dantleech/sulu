@@ -94,7 +94,7 @@ class SuluContentExtension extends Extension implements PrependExtensionInterfac
 
         $loader = new XmlFileLoader($container, new FileLocator(__DIR__ . '/../Resources/config'));
 
-        $this->processDocumentManager($container, $config);
+        $this->processPublish($container, $config);
         $this->processTemplates($container, $config);
         $this->processPreview($container, $config);
 
@@ -114,9 +114,35 @@ class SuluContentExtension extends Extension implements PrependExtensionInterfac
         $loader->load('serializer.xml');
     }
 
-    private function processDocumentManager(ContainerBuilder $container, $config)
+    private function processPublish(ContainerBuilder $container, $config)
     {
         $container->setParameter('sulu.content.publish.document_manager', $config['publish']['document_manager']);
+
+        $invalidClasses = [];
+        foreach ($config['publish']['cascade'] as $classFqn => $targetFqns) {
+            if (!class_exists($classFqn)) {
+                $invalidClasses[] = $classFqn;
+            }
+
+            foreach ($targetFqns as $targetFqn) {
+                if (!class_exists($targetFqn)) {
+                    $invalidClasses[] = $targetFqn;
+                }
+            }
+        }
+
+        if ($invalidClasses) {
+            throw new \RuntimeException(sprintf(
+                'Unknown classes used for synchronization cascade configuration: "%s"',
+                implode('", "', $invalidClasses)
+            ));
+        }
+
+        // TODO: Also ensure that "primary" synchronization documents implement
+        //       the SynchronizeBehavior
+
+        $container->setParameter('sulu.content.publish.cascade', $config['publish']['cascade']);
+
     }
 
     private function processPreview(ContainerBuilder $container, $config)

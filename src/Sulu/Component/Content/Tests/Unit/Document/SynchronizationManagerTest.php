@@ -23,6 +23,7 @@ use Sulu\Component\Content\Document\SynchronizationManager;
 use Sulu\Component\Content\Document\Syncronization\DocumentRegistrator;
 use Sulu\Component\DocumentManager\Behavior\Mapping\LocaleBehavior;
 use Sulu\Component\DocumentManager\DocumentManagerInterface;
+use Sulu\Bundle\ContentBundle\Document\PageDocument;
 
 /**
  * Abbreviations:.
@@ -41,11 +42,6 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
      * @var PropertyEncoder
      */
     private $propertyEncoder;
-
-    /**
-     * @var SynchronizationManager
-     */
-    private $syncManager;
 
     /**
      * @var DocumentManagerInterface
@@ -70,39 +66,55 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
     /**
      * @var NodeInterface
      */
-    private $ddmNode;
-
-    /**
-     * @var SynchronizeBehavior
-     */
-    private $document;
+    private $ddmNode1;
 
     public function setUp()
     {
         $this->managerRegistry = $this->prophesize(DocumentManagerRegistry::class);
         $this->propertyEncoder = $this->prophesize(PropertyEncoder::class);
         $this->registrator = $this->prophesize(DocumentRegistrator::class);
-
-        $this->syncManager = new SynchronizationManager(
-            $this->managerRegistry->reveal(),
-            $this->propertyEncoder->reveal(),
-            'live',
-            $this->registrator->reveal()
-        );
-
         $this->ddm = $this->prophesize(DocumentManagerInterface::class);
         $this->pdm = $this->prophesize(DocumentManagerInterface::class);
         $this->route1 = $this->prophesize(RouteDocument::class)
             ->willImplement(SynchronizeBehavior::class);
         $this->ddmInspector = $this->prophesize(DocumentInspector::class);
-        $this->ddmNode = $this->prophesize(NodeInterface::class);
-        $this->document = $this->prophesize(SynchronizeBehavior::class);
+        $this->ddmNode1 = $this->prophesize(NodeInterface::class);
+        $this->ddmNode2 = $this->prophesize(NodeInterface::class);
 
         $this->ddm->getInspector()->willReturn($this->ddmInspector->reveal());
     }
 
     /**
-     * (synchronize full) It should return early if publish manager and default manager are
+     * It should synchronize a document to the publish document manager.
+     * It should register the fact that the document is synchronized with the PDM.
+     * It should NOT localize the PHPCR property for a non-localized document.
+     */
+    public function testPublish()
+    {
+        $document = new TestDocument([]);
+
+        $this->managerRegistry->getManager()->willReturn($this->ddm->reveal());
+        $this->managerRegistry->getManager('live')->willReturn($this->pdm->reveal());
+
+        $this->ddmInspector->getLocale($document)->willReturn('fr');
+        $this->ddmInspector->getPath($document)->willReturn('/path/1');
+        $this->ddmInspector->getNode($document)->willReturn($this->ddmNode1->reveal());
+
+        $this->propertyEncoder->systemName(SynchronizeBehavior::SYNCED_FIELD)->shouldBeCalled();
+        $this->pdm->persist(
+            $document,
+            'fr',
+            [
+                'path' => '/path/1',
+            ]
+        )->shouldBeCalled();
+
+        $this->createSyncManager()->synchronize($document);
+    }
+
+
+    /**
+     * It should return early if publish manager and default manager are
      * the same.
      */
     public function testSynchronizeFullPublishAndDefaultManagersAreSame()
@@ -112,52 +124,51 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
 
         $this->pdm->persist(Argument::cetera())->shouldNotBeCalled();
 
-        $this->syncManager->synchronizeFull($this->document->reveal());
+        $this->createSyncManager()->synchronize(new TestDocument([]));
     }
 
     /**
-     * (synchronize full) It should get all the routes for the document and synchronize them.
+     * It should cascade configured referrers for the document and synchronize them.
      */
     public function testSynchronizeRoutes()
     {
+        $document = new TestDocument();
+
         $this->managerRegistry->getManager()->willReturn($this->ddm->reveal());
         $this->managerRegistry->getManager('live')->willReturn($this->pdm->reveal());
 
-        // make the document implement the resource segment behavior - which would indicate
-        // that it has routes associated with it.
-        $this->document->willImplement(ResourceSegmentBehavior::class);
-
         // return one route and one stdClass (the stdClass should be filtered)
-        $this->ddmInspector->getReferrers($this->document->reveal())->willReturn([
+        $this->ddmInspector->getReferrers($document)->willReturn([
             $this->route1->reveal(),
             new \stdClass(),
         ]);
+        $this->ddmInspector->getReferrers($this->route1->reveal())->willReturn([]);
 
-        // the route is not currently synced
+        // neither document nor route are currently synchronized
         $this->route1->getSynchronizedManagers()->willReturn([]);
 
-        // the main document IS already synced (somehow)
-        // so it will not be re-persisted to the PDM
-        $this->document->getSynchronizedManagers()->willReturn(['live']);
+        $this->ddmInspector->getLocale($document)->willReturn('fr');
+        $this->ddmInspector->getPath($document)->willReturn('/');
+        $this->ddmInspector->getNode($document)->willReturn($this->ddmNode1->reveal());
 
         $this->ddmInspector->getLocale($this->route1->reveal())->willReturn('fr');
         $this->ddmInspector->getPath($this->route1->reveal())->willReturn('/path/1');
-        $this->ddmInspector->getNode($this->route1->reveal())->willReturn($this->ddmNode->reveal());
+        $this->ddmInspector->getNode($this->route1->reveal())->willReturn($this->ddmNode2->reveal());
 
-        // persist should be called once for the route document
-        $this->pdm->persist(
-            $this->route1->reveal(),
-            'fr',
-            [
-                'path' => '/path/1',
+        // persist should be called once for both the document and the route object
+        $this->pdm->persist($this->route1->reveal(), 'fr', [ 'path' => '/path/1' ])
+            ->shouldBeCalled();
+        $this->pdm->persist($document, 'fr', [ 'path' => '/' ])
+            ->shouldBeCalled();
+
+        $this->pdm->flush()->shouldNotBeCalled();
+        $this->ddm->flush()->shouldNotBeCalled();
+
+        $this->createSyncManager([
+            SynchronizeBehavior::class => [
+                RouteDocument::class
             ]
-        )->shouldBeCalled();
-
-        // both the PDM and the DDM should be flushed.
-        $this->pdm->flush()->shouldBeCalledTimes(1);
-        $this->ddm->flush()->shouldBeCalledTimes(1);
-
-        $this->syncManager->synchronizeFull($this->document->reveal());
+        ])->synchronize($document, [ 'cascade' => true ]);
     }
 
     /**
@@ -170,7 +181,7 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
 
         $this->pdm->persist(Argument::cetera())->shouldNotBeCalled();
 
-        $this->syncManager->synchronizeSingle($this->document->reveal());
+        $this->createSyncManager()->synchronize(new TestDocument());
     }
 
     /**
@@ -178,24 +189,22 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
      */
     public function testLocalizedPhpcrSyncedProperty()
     {
+        $document = new LocalizedTestDocument([], 'fr');
         $this->managerRegistry->getManager()->willReturn($this->ddm->reveal());
         $this->managerRegistry->getManager('live')->willReturn($this->pdm->reveal());
 
-        $this->document->willImplement(LocaleBehavior::class);
-        $this->document->getSynchronizedManagers()->willReturn([]);
-
-        $this->ddmInspector->getLocale($this->document->reveal())->willReturn('fr');
-        $this->ddmInspector->getPath($this->document->reveal())->willReturn('/path/1');
-        $this->ddmInspector->getNode($this->document->reveal())->willReturn($this->ddmNode->reveal());
+        $this->ddmInspector->getLocale($document)->willReturn('fr');
+        $this->ddmInspector->getPath($document)->willReturn('/path/1');
+        $this->ddmInspector->getNode($document)->willReturn($this->ddmNode1->reveal());
 
         $this->pdm->persist(Argument::cetera())->shouldBeCalled();
         $this->propertyEncoder->localizedSystemName(
             SynchronizeBehavior::SYNCED_FIELD,
             'fr'
         )->willReturn('foobar');
-        $this->ddmNode->setProperty('foobar', ['live'])->shouldBeCalled();
+        $this->ddmNode1->setProperty('foobar', ['live'])->shouldBeCalled();
 
-        $this->syncManager->synchronizeSingle($this->document->reveal());
+        $this->createSyncManager()->synchronize($document);
     }
 
     /**
@@ -204,39 +213,66 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
      */
     public function testDocumentBelievesItIsSynchronizedNoForce()
     {
+        $document = new TestDocument(['live']);
         $this->managerRegistry->getManager()->willReturn($this->ddm->reveal());
         $this->managerRegistry->getManager('live')->willReturn($this->pdm->reveal());
-        $this->document->getSynchronizedManagers()->willReturn(['live']);
 
         $this->pdm->persist(Argument::cetera())->shouldNotBeCalled();
 
-        $this->syncManager->synchronizeSingle($this->document->reveal());
+        $this->createSyncManager()->synchronize($document);
     }
 
-    /**
-     * It should synchronize a document to the publish document manager.
-     * It should register the fact that the document is synchronized with the PDM.
-     * It should NOT localize the PHPCR property for a non-localized document.
-     */
-    public function testPublishSingle()
+    private function createSyncManager(array $cascadeMap = [])
     {
-        $this->managerRegistry->getManager()->willReturn($this->ddm->reveal());
-        $this->managerRegistry->getManager('live')->willReturn($this->pdm->reveal());
-        $this->document->getSynchronizedManagers()->willReturn([]);
+        return new SynchronizationManager(
+            $this->managerRegistry->reveal(),
+            $this->propertyEncoder->reveal(),
+            'live',
+            $cascadeMap,
+            $this->registrator->reveal()
+        );
 
-        $this->ddmInspector->getLocale($this->document->reveal())->willReturn('fr');
-        $this->ddmInspector->getPath($this->document->reveal())->willReturn('/path/1');
-        $this->ddmInspector->getNode($this->document->reveal())->willReturn($this->ddmNode->reveal());
+    }
+}
 
-        $this->propertyEncoder->systemName(SynchronizeBehavior::SYNCED_FIELD)->shouldBeCalled();
-        $this->pdm->persist(
-            $this->document->reveal(),
-            'fr',
-            [
-                'path' => '/path/1',
-            ]
-        )->shouldBeCalled();
+/**
+ * Remove this: see https://github.com/dantleech/sulu/pull/2
+ */
+class TestDocument implements SynchronizeBehavior
+{
+    private $synchronizedManagers;
 
-        $this->syncManager->synchronizeSingle($this->document->reveal());
+    public function __construct(array $synchronizedManagers = [])
+    {
+        $this->synchronizedManagers = $synchronizedManagers;
+    }
+
+    public function getSynchronizedManagers()
+    {
+        return $this->synchronizedManagers;
+    }
+}
+
+/**
+ * Remove this: see https://github.com/dantleech/sulu/pull/2
+ */
+class LocalizedTestDocument extends TestDocument implements LocaleBehavior
+{
+    private $synchronizedManagers;
+    private $locale;
+
+    public function __construct(array $synchronizedManagers = [], $locale)
+    {
+        $this->synchronizedManagers = $synchronizedManagers;
+        $this->locale = $locale;
+    }
+
+    public function getLocale()
+    {
+        return $this->locale;
+    }
+
+    public function setLocale($locale)
+    {
     }
 }

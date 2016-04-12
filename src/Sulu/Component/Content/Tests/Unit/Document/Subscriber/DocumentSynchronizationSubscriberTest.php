@@ -19,6 +19,7 @@ use Sulu\Component\DocumentManager\DocumentManagerInterface;
 use Sulu\Component\DocumentManager\Event\RemoveEvent;
 use Sulu\Component\DocumentManager\Metadata;
 use Sulu\Component\DocumentManager\MetadataFactoryInterface;
+use Sulu\Component\DocumentManager\Event\MoveEvent;
 
 class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
 {
@@ -81,6 +82,7 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
         $this->removeEvent->getManager()->willReturn($this->manager->reveal());
         $this->metadataFactory = $this->prophesize(MetadataFactoryInterface::class);
         $this->metadata = $this->prophesize(Metadata::class);
+        $this->moveEvent = $this->prophesize(MoveEvent::class);
     }
 
     /**
@@ -129,7 +131,7 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
 
         $this->manager->flush()->shouldBeCalled();
         $this->publishManager->flush()->shouldBeCalled();
-        $this->syncManager->synchronizeSingle($this->document->reveal())->shouldBeCalled();
+        $this->syncManager->synchronize($this->document->reveal(), [ 'cascade' => true ])->shouldBeCalled();
 
         $this->subscriber->handlePersist($this->persistEvent->reveal());
         $this->subscriber->handleFlush($this->flushEvent->reveal());
@@ -153,7 +155,7 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
 
         $this->manager->flush()->shouldBeCalled();
         $this->publishManager->flush()->shouldBeCalled();
-        $this->syncManager->synchronizeSingle($this->document->reveal())->shouldBeCalled();
+        $this->syncManager->synchronize($this->document->reveal(), [ 'cascade' => true ])->shouldBeCalled();
 
         $this->subscriber->handlePersist($this->persistEvent->reveal());
         $this->subscriber->handleFlush($this->flushEvent->reveal());
@@ -190,5 +192,17 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
 
         $this->subscriber->handleRemove($this->removeEvent->reveal());
         $this->subscriber->handleFlush($this->flushEvent->reveal());
+    }
+
+    /**
+     * It should clear the documents synchrnoized managers field when moved.
+     */
+    public function testMove()
+    {
+        $this->manager->getMetadataFactory()->willReturn($this->metadataFactory->reveal());
+        $this->metadataFactory->getMetadataForClass(get_class($this->document->reveal()))->willReturn($this->metadata->reveal());
+        $this->metadata->setFieldValue($this->document->reveal(), 'synced', 'live');
+
+        $this->subscriber->handleMove($this->moveEvent->reveal());
     }
 }
