@@ -40,7 +40,7 @@ class SyncronizationManagerTest extends SuluTestCase
         $this->manager = $kernel->getContainer()->get('sulu_document_manager.document_manager');
         $this->syncManager = $kernel->getContainer()->get('sulu_content.document.synchronization_manager');
         $this->publishDocumentManager = $this->syncManager->getPublishDocumentManager();
-        $this->initPhpcr();
+        $this->initPhpcr($kernel);
         $this->parent = $this->manager->find('/cmf/sulu_io/contents', 'de');
     }
 
@@ -70,6 +70,9 @@ class SyncronizationManagerTest extends SuluTestCase
         $this->assertEquals(['live'], $page->getSynchronizedManagers());
 
         $this->assertExistsInPublishDocumentManager($page);
+
+        $route = $this->publishDocumentManager->find('/cmf/sulu_io/routes/de/bar');
+        $this->assertNotNull($route);
     }
 
     /**
@@ -90,11 +93,54 @@ class SyncronizationManagerTest extends SuluTestCase
         $this->manager->persist($page, 'de');
         $this->manager->flush();
 
-        $this->syncManager->synchronizeFull($page);
+        $this->syncManager->synchronize($page, [ 'flush' => true ]);
         $this->assertExistsInPublishDocumentManager($page);
 
         $page = $this->publishDocumentManager->find($page->getUuid(), 'de');
         $this->assertEquals('Barbar', $page->getTitle());
+    }
+
+    /**
+     * It should update the related routes (cascade) when the document is synchronized.
+     */
+    public function testSynchronizeCascade()
+    {
+        $page = $this->createPage([
+            'title' => 'Foobar',
+            'integer' => 1234,
+        ]);
+        $page->setResourceSegment('/bar');
+
+        $this->manager->persist($page, 'de');
+        $this->manager->flush();
+
+        $page->setTitle('Barbar');
+        $page->setResourceSegment('/new-route');
+        $this->manager->persist($page, 'de');
+        $this->manager->flush();
+
+        // assert that both page and route, having been updated,
+        // no longer think they are synchronized.
+        $page = $this->manager->find($page->getUuid(), 'de');
+        $this->assertEmpty($page->getSynchronizedManagers());
+
+        // synchronize the page, and cascade.
+        $this->syncManager->synchronize($page, [ 'cascade' => true, 'flush' => true ]);
+
+        $this->assertEquals($page->getSynchronizedManagers(), [ 'live' ]);
+        $this->assertExistsInPublishDocumentManager($page);
+
+        $page = $this->publishDocumentManager->find($page->getUuid(), 'de');
+        $this->assertEquals('Barbar', $page->getTitle());
+
+        // the old route should have been updated and it should now be a
+        // "history" route.
+        //
+        // TODO: We should not couple the test to this behavior, but the overhead
+        //       of creating a new document is too great for now.
+        //       see: https://github.com/sulu/sulu-document-manager/issues/73
+        $route = $this->publishDocumentManager->find('/cmf/sulu_io/routes/de/bar');
+        $this->assertTrue($route->isHistory());
     }
 
     /**
@@ -112,8 +158,9 @@ class SyncronizationManagerTest extends SuluTestCase
         $this->manager->flush();
         $this->manager->getNodeManager()->createPath('/cmf/sulu_io/contents/foo/bar');
         $this->manager->move($page, '/cmf/sulu_io/contents/foo/bar');
+        $this->manager->flush();
 
-        $this->syncManager->synchronizeFull($page);
+        $this->syncManager->synchronize($page, [ 'flush' => true ]);
 
         $this->assertExistsInPublishDocumentManager($page);
         $page = $this->publishDocumentManager->find($page->getUuid(), 'de');

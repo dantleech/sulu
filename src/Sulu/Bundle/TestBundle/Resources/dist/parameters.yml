@@ -11,5 +11,4 @@ parameters:
     phpcr.backend_url: http://localhost:8080/server/
     phpcr.username: admin
     phpcr.password: admin
-    phpcr.workspace.live: live
     phpcr.workspace.default: test
