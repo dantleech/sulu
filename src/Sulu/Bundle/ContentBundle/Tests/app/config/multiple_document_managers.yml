@@ -1,6 +1,25 @@
 sulu_content:    
     publish:
         document_manager: live
+        cascade:
+            Sulu\Bundle\ContentBundle\Document\BasePageDocument:
+                - Sulu\Bundle\ContentBundle\Document\RouteDocument
+            Sulu\Bundle\ContentBundle\Document\RouteDocument:
+                - Sulu\Bundle\ContentBundle\Document\RouteDocument
+
+# Add a live session and document manager to the default configuration
+sulu_document_manager:
+    sessions:
+        live:
+            backend:
+                type: "%phpcr.transport%"
+                url:  "%phpcr.backend_url%"
+            username: "%phpcr.username%"
+            password: "%phpcr.password%"
+            workspace: live
+    managers:
+        live:
+            session: live
 
 monolog:
     handlers:

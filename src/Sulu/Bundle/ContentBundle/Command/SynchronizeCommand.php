@@ -110,9 +110,8 @@ class SynchronizeCommand extends Command
                 $this->defaultManager->find($inspector->getUuid($document), $locale);
 
                 try {
-                    $this->syncManager->synchronizeSingle($document, [
+                    $this->syncManager->synchronize($document, [
                         'force' => $force,
-                        'repair' => true,
                     ]);
                     $synced = $document->getSynchronizedManagers() ?: [];
                     $output->writeln(sprintf(

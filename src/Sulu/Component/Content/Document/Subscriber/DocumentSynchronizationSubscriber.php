@@ -21,6 +21,8 @@ use Sulu\Component\DocumentManager\Event\PersistEvent;
 use Sulu\Component\DocumentManager\Event\RemoveEvent;
 use Sulu\Component\DocumentManager\Events;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Sulu\Component\DocumentManager\Event\MoveEvent;
+use Sulu\Component\DocumentManager\Event\AbstractManagerEvent;
 
 class DocumentSynchronizationSubscriber implements EventSubscriberInterface
 {
@@ -65,6 +67,7 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
             Events::FLUSH => 'handleFlush',
             Events::REMOVE => 'handleRemove',
             Events::METADATA_LOAD => 'handleMetadataLoad',
+            Events::MOVE => 'handleMove',
 
             // persist needs to be before the content mapper subscriber
             // because we need to stop propagation early on the publish
@@ -114,11 +117,8 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
 
         // only sync new documents automatically
         if (false === $event->getNode()->isNew()) {
-            // otherwise the node is now capable of synchronized with all the managers.
-            $event->getManager()
-                ->getMetadataFactory()
-                ->getMetadataForClass(get_class($document))
-                ->setFieldValue($document, 'synchronizedManagers', []);
+            // document is now "dirty" and no longer synchronized with any managers.
+            $this->clearSynchronizedManagers($event, $document);
 
             return;
         }
@@ -145,6 +145,18 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
         }
 
         $this->removeQueue[] = $document;
+    }
+
+    public function handleMove(MoveEvent $event)
+    {
+        $document = $event->getDocument();
+
+        if (!$document instanceof SynchronizeBehavior) {
+            return;
+        }
+
+        // if the document has been moved, it is no longer in sync.
+        $this->clearSynchronizedManagers($event, $document);
     }
 
     public function handleFlush(FlushEvent $event)
@@ -180,8 +192,9 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
                 $this->defaultManager->find($inspector->getUUid($document), $locale);
             }
 
-            // delegate to the sync manager to synchronize the document.
-            $this->syncManager->synchronizeSingle($document);
+            // synchronize the document, cascading the synchronization to any
+            // configured relations.
+            $this->syncManager->synchronize($document, [ 'cascade' => true ]);
         }
         while ($entry = array_shift($this->removeQueue)) {
             $publishManager->remove($entry);
@@ -209,5 +222,12 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
         throw new \RuntimeException(
             'The document syncronization subscriber must only be registered to the default document manager'
         );
+    }
+
+    private function clearSynchronizedManagers(AbstractManagerEvent $event, $document)
+    {
+        // node is now "dirty" and no longer synchronized with any managers.
+        $metadata = $event->getManager()->getMetadataFactory()->getMetadataForClass(get_class($document));
+        $metadata->setFieldValue($document, 'synchronizedManagers', []);
     }
 }
