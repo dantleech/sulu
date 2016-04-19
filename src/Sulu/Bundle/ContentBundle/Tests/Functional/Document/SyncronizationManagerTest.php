@@ -53,7 +53,7 @@ class SyncronizationManagerTest extends SuluTestCase
     }
 
     /**
-     * New documents are automatically synced via. the subscriber.
+     * 1. Route documents are not automatically synced via. the subscriber.
      */
     public function testAutomaticSync()
     {
@@ -67,18 +67,15 @@ class SyncronizationManagerTest extends SuluTestCase
         $this->manager->flush();
 
         $this->manager->find($page->getUuid(), 'de');
-        $this->assertEquals(['live'], $page->getSynchronizedManagers());
+        $this->assertEmpty($page->getSynchronizedManagers());
 
-        $this->assertExistsInPublishDocumentManager($page);
-
-        $route = $this->publishDocumentManager->find('/cmf/sulu_io/routes/de/bar');
-        $this->assertNotNull($route);
+        $this->assertNotExistsInPublishDocumentManager($page);
     }
 
     /**
-     * It should update the published document when synchronized action is invoked.
+     * 2. When a page is moved, it MUST also be moved in the TDM.
      */
-    public function testSynchronize()
+    public function testMovePageInTdm()
     {
         $page = $this->createPage([
             'title' => 'Foobar',
@@ -88,22 +85,79 @@ class SyncronizationManagerTest extends SuluTestCase
 
         $this->manager->persist($page, 'de');
         $this->manager->flush();
-
-        $page->setTitle('Barbar');
-        $this->manager->persist($page, 'de');
+        $this->manager->getNodeManager()->createPath('/cmf/sulu_io/contents/foo/bar');
+        $this->manager->move($page, '/cmf/sulu_io/contents/foo/bar');
         $this->manager->flush();
 
-        $this->syncManager->synchronize($page, [ 'flush' => true ]);
         $this->assertExistsInPublishDocumentManager($page);
-
         $page = $this->publishDocumentManager->find($page->getUuid(), 'de');
-        $this->assertEquals('Barbar', $page->getTitle());
+
+        $this->assertEquals(
+            '/cmf/sulu_io/contents/foo/bar/foobar', 
+            $page->getPath(),
+            'Page has new path'
+        );
     }
 
     /**
-     * It should update the related routes (cascade) when the document is synchronized.
+     * 3. When a page is deleted, it MUST also be removed from the TDM.
      */
-    public function testSynchronizeCascade()
+    public function testPageDeleted()
+    {
+        $page = $this->createPage([
+            'title' => 'Foobar',
+            'integer' => 1234,
+        ]);
+
+        $this->manager->persist($page, 'de');
+        $this->manager->flush();
+
+        $this->syncManager->synchronize($page, [ 'flush' => true, 'cascade' => true ]);
+
+        $this->assertExistsInPublishDocumentManager($page);
+
+        $this->manager->remove($page);
+        $this->manager->flush();
+
+        $this->assertNotExistsInPublishDocumentManager($page);
+    }
+
+    /**
+     * 4. When a page is deleted from the SDM, any references to this page from the TDM should be removed.
+     */
+    public function testRemoveReferences()
+    {
+        $this->markTestSkipped('todo');
+    }
+
+    /**
+     * 5. Routes must not be automatically synced.
+     */
+    public function testRoutesNotSynced()
+    {
+        $this->markTestSkipped('todo');
+    }
+
+    /**
+     * 6. Pages MUST be immediately deleted from the TDM when deleted from the SDM.
+     */
+    public function testDeletePage()
+    {
+        $this->markTestSkipped('todo');
+    }
+
+    /**
+     * 7. Any referring routes which exist in the TDM and do not exist in the SDM should be deleted from the TDM.
+     */
+    public function testSyncPageWithDeletedRoutes()
+    {
+        $this->markTestSkipped('todo');
+    }
+
+    /**
+     * 9. Pages push must cascade to any related routes and the route-referrers of those routes.
+     */
+    public function testPushCascade()
     {
         $page = $this->createPage([
             'title' => 'Foobar',
@@ -144,9 +198,9 @@ class SyncronizationManagerTest extends SuluTestCase
     }
 
     /**
-     * It should publish documents that have been moved in the default document manager.
+     * It should update the published document when synchronized action is invoked.
      */
-    public function testMovedInDefault()
+    public function testSynchronize()
     {
         $page = $this->createPage([
             'title' => 'Foobar',
@@ -156,15 +210,23 @@ class SyncronizationManagerTest extends SuluTestCase
 
         $this->manager->persist($page, 'de');
         $this->manager->flush();
-        $this->manager->getNodeManager()->createPath('/cmf/sulu_io/contents/foo/bar');
-        $this->manager->move($page, '/cmf/sulu_io/contents/foo/bar');
+
+        $page->setTitle('Barbar');
+        $this->manager->persist($page, 'de');
         $this->manager->flush();
 
         $this->syncManager->synchronize($page, [ 'flush' => true ]);
-
         $this->assertExistsInPublishDocumentManager($page);
+
         $page = $this->publishDocumentManager->find($page->getUuid(), 'de');
-        $this->assertEquals('/cmf/sulu_io/contents/foo/bar/foobar', $page->getPath());
+        $this->assertEquals('Barbar', $page->getTitle());
+    }
+
+    /**
+     * It should publish documents that have been moved in the default document manager.
+     */
+    public function testMovedInDefault()
+    {
     }
 
     private function createPage($data)

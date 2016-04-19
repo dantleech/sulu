@@ -94,7 +94,6 @@ class SuluContentExtension extends Extension implements PrependExtensionInterfac
 
         $loader = new XmlFileLoader($container, new FileLocator(__DIR__ . '/../Resources/config'));
 
-        $this->processPublish($container, $config);
         $this->processTemplates($container, $config);
         $this->processPreview($container, $config);
 
@@ -112,21 +111,25 @@ class SuluContentExtension extends Extension implements PrependExtensionInterfac
         $loader->load('compat.xml');
         $loader->load('document.xml');
         $loader->load('serializer.xml');
+
+        $this->processSynchronize($container, $config, $loader);
     }
 
-    private function processPublish(ContainerBuilder $container, $config)
+    private function processSynchronize(ContainerBuilder $container, $config, LoaderInterface $loader)
     {
-        $container->setParameter('sulu.content.publish.document_manager', $config['publish']['document_manager']);
-
         $invalidClasses = [];
-        foreach ($config['publish']['cascade'] as $classFqn => $targetFqns) {
+        foreach ($config['synchronize']['mapping'] as $classFqn => $mapping) {
+            // TODO: Also ensure that "primary" synchronization documents implement
+            //       the SynchronizeBehavior
             if (!class_exists($classFqn)) {
                 $invalidClasses[] = $classFqn;
+                continue;
             }
 
-            foreach ($targetFqns as $targetFqn) {
-                if (!class_exists($targetFqn)) {
-                    $invalidClasses[] = $targetFqn;
+            foreach ($mapping['cascade_referrers'] as $classFqn) {
+                if (!class_exists($classFqn)) {
+                    $invalidClasses[] = $classFqn;
+                    break 2;
                 }
             }
         }
@@ -138,11 +141,10 @@ class SuluContentExtension extends Extension implements PrependExtensionInterfac
             ));
         }
 
-        // TODO: Also ensure that "primary" synchronization documents implement
-        //       the SynchronizeBehavior
-
-        $container->setParameter('sulu.content.publish.cascade', $config['publish']['cascade']);
-
+        $container->setParameter('sulu.content.document.synchronization.document_manager', $config['synchronize']['target_document_manager']);
+        $container->setParameter('sulu.content.document.synchronization.auto_sync', $config['synchronize']['default_mapping']['auto_sync']);
+        $container->setParameter('sulu.content.document.synchronization.mapping', $config['synchronize']['mapping']);
+        $loader->load('document_synchronize.xml');
     }
 
     private function processPreview(ContainerBuilder $container, $config)

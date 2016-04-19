@@ -23,6 +23,7 @@ use Sulu\Component\DocumentManager\Events;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Sulu\Component\DocumentManager\Event\MoveEvent;
 use Sulu\Component\DocumentManager\Event\AbstractManagerEvent;
+use Sulu\Component\Content\Document\Syncronization\Mapping;
 
 class DocumentSynchronizationSubscriber implements EventSubscriberInterface
 {
@@ -47,15 +48,21 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
     private $removeQueue = [];
 
     /**
+     * @var Mapping
+     */
+    private $mapping;
+
+    /**
      * NOTE: We pass the default manager here because we need to ensure that we
      *       only process documents FROM the default manager. If we could assign
      *       event subscribers to specific document managers this would not
      *       be necessary.
      */
-    public function __construct(DocumentManagerInterface $defaultManager, SynchronizationManager $syncManager)
+    public function __construct(DocumentManagerInterface $defaultManager, SynchronizationManager $syncManager, Mapping $mapping)
     {
         $this->defaultManager = $defaultManager;
         $this->syncManager = $syncManager;
+        $this->mapping = $mapping;
     }
 
     /**
@@ -115,6 +122,10 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
             return;
         }
 
+        if (false === $this->mapping->hasAutoSyncPolicy($document, [ 'update', 'create' ])) {
+            return;
+        }
+
         // only sync new documents automatically
         if (false === $event->getNode()->isNew()) {
             // document is now "dirty" and no longer synchronized with any managers.
@@ -144,6 +155,10 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
             return;
         }
 
+        if (false === $this->mapping->hasAutoSyncPolicy($document, [ 'delete' ])) {
+            return;
+        }
+
         $this->removeQueue[] = $document;
     }
 
@@ -155,8 +170,17 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
             return;
         }
 
-        // if the document has been moved, it is no longer in sync.
-        $this->clearSynchronizedManagers($event, $document);
+        if (false === $this->mapping->hasAutoSyncPolicy($document, [ 'move' ])) {
+            // remove synchronization status of document, it will be moved upon
+            // the next synchronization.
+            $this->clearSynchronizedManagers($event, $document);
+            return;
+        }
+
+        throw new \BadMethodCallException(
+            'Direct move not yet supported'
+        );
+
     }
 
     public function handleFlush(FlushEvent $event)
@@ -197,6 +221,7 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
             $this->syncManager->synchronize($document, [ 'cascade' => true ]);
         }
         while ($entry = array_shift($this->removeQueue)) {
+            var_dump(get_class($entry));
             $publishManager->remove($entry);
         }
 
