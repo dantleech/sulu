@@ -1,11 +1,20 @@
 sulu_content:    
-    publish:
-        document_manager: live
-        cascade:
+    synchronize:
+        target_document_manager: live
+        default_mapping:
+            ## for all documents
+            auto_sync: [ "create", "update", "move", "delete" ]
+        mapping:
+            ## page documents
             Sulu\Bundle\ContentBundle\Document\BasePageDocument:
-                - Sulu\Bundle\ContentBundle\Document\RouteDocument
+                auto_sync: [ "delete", "move" ]
+                cascade_referrers:
+                    - Sulu\Bundle\ContentBundle\Document\RouteDocument
+            ## route documents
             Sulu\Bundle\ContentBundle\Document\RouteDocument:
-                - Sulu\Bundle\ContentBundle\Document\RouteDocument
+                auto_sync: [ "delete", "move" ]
+                cascade_referrers:
+                    - Sulu\Bundle\ContentBundle\Document\RouteDocument
 
 # Add a live session and document manager to the default configuration
 sulu_document_manager:

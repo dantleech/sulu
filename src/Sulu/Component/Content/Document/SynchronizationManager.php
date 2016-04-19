@@ -19,6 +19,7 @@ use Sulu\Component\Content\Document\Behavior\SynchronizeBehavior;
 use Sulu\Component\Content\Document\Syncronization\DocumentRegistrator;
 use Sulu\Component\DocumentManager\Behavior\Mapping\LocaleBehavior;
 use Sulu\Component\DocumentManager\DocumentManagerRegistryInterface;
+use Sulu\Component\Content\Document\Syncronization\Mapping;
 
 /**
  * The synchronization manager handles the synchronization of documents
@@ -51,19 +52,19 @@ class SynchronizationManager
     /**
      * @var array
      */
-    private $cascadeMap;
+    private $mapping;
 
     public function __construct(
         DocumentManagerRegistry $registry,
         PropertyEncoder $encoder,
         $publishManagerName,
-        array $cascadeMap = [],
+        Mapping $mapping,
         $registrator = null
     ) {
         $this->registry = $registry;
         $this->publishManagerName = $publishManagerName;
         $this->encoder = $encoder;
-        $this->cascadeMap = $cascadeMap;
+        $this->mapping = $mapping;
         $this->registrator = $registrator ?: new DocumentRegistrator(
             $registry->getManager(),
             $registry->getManager($this->publishManagerName)
@@ -211,15 +212,7 @@ class SynchronizationManager
 
     private function cascadeRelations($document, array $options)
     {
-        $cascadeFqns = [];
-        foreach ($this->cascadeMap as $classFqn => $targetFqns) {
-            if (false === $this->isInstanceOf($classFqn, $document)) {
-                continue;
-            }
-
-            $cascadeFqns = $targetFqns;
-            break;
-        }
+        $cascadeFqns = $this->mapping->getCascadeReferrers($document);
 
         if (empty($cascadeFqns)) {
             return;

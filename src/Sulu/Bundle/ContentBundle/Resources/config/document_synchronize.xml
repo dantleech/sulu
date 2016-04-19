@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<container xmlns="http://symfony.com/schema/dic/services"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://symfony.com/schema/dic/services http://symfony.com/schema/dic/services/services-1.0.xsd">
+
+    <services>
+
+        <service id="sulu_content.command.synchronize_document" class="Sulu\Bundle\ContentBundle\Command\SynchronizeCommand">
+            <argument type="service" id="sulu_document_manager.document_manager" />
+            <argument type="service" id="sulu_content.document.synchronization_manager" />
+            <tag name="console.command" />
+        </service>
+
+        <service id="sulu_document_manager.document.subscriber.document_synchronization"
+            class="Sulu\Component\Content\Document\Subscriber\DocumentSynchronizationSubscriber">
+            <argument type="service" id="sulu_document_manager.document_manager" />
+            <argument type="service" id="sulu_content.document.synchronization_manager" />
+            <argument type="service" id="sulu_content.document.synchronization.mapping" />
+            <tag name="sulu_document_manager.event_subscriber" manager="default" />
+        </service>
+
+        <service id="sulu_content.document.synchronization_manager"
+            class="Sulu\Component\Content\Document\SynchronizationManager">
+            <argument type="service" id="sulu_document_manager.registry" />
+            <argument type="service" id="sulu_document_manager.property_encoder" />
+            <argument>%sulu.content.document.synchronization.document_manager%</argument>
+            <argument type="service" id="sulu_content.document.synchronization.mapping" />
+        </service>
+
+        <service id="sulu_content.document.synchronization.mapping"
+            class="Sulu\Component\Content\Document\Syncronization\Mapping">
+            <argument>%sulu.content.document.synchronization.auto_sync%</argument>
+            <argument>%sulu.content.document.synchronization.mapping%</argument>
+        </service>
+
+    </services>
+</container>
