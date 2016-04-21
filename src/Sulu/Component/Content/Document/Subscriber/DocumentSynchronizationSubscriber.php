@@ -221,8 +221,8 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
             $this->syncManager->synchronize($document, [ 'cascade' => true ]);
         }
         while ($entry = array_shift($this->removeQueue)) {
-            var_dump(get_class($entry));
-            $publishManager->remove($entry);
+            // NOTE: this will not work when the document is not registeredro
+            $this->syncManager->remove($entry);
         }
 
         // flush both managers. the publish manager will then commit
