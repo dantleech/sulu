@@ -151,6 +151,7 @@ class SyncronizationManagerTest extends SuluTestCase
             $this->manager->getInspector()->getNode($page),
             PropertyType::REFERENCE
         );
+        $this->publishDocumentManager->getNodeManager()->save();
 
         $this->manager->remove($page);
         $this->manager->flush();
