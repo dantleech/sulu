@@ -29,6 +29,7 @@ class Configuration implements ConfigurationInterface
             ->addDefaultsIfNotSet()
             ->children()
                 ->arrayNode('synchronize')
+                    ->canBeEnabled()
                     ->addDefaultsIfNotSet()
                     ->children()
                         ->scalarNode('target_document_manager')

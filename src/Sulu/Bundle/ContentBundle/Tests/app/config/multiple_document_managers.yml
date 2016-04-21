@@ -18,7 +18,6 @@ sulu_content:
 
 # Add a live session and document manager to the default configuration
 sulu_document_manager:
-    debug: true
     sessions:
         live:
             backend:

@@ -16,6 +16,10 @@ use Sulu\Bundle\TestBundle\Testing\SuluTestCase;
 use PHPCR\PropertyType;
 use Sulu\Bundle\ContentBundle\Document\RouteDocument;
 
+/**
+ * This test is for the specific requirements of Sulu not the general
+ * functionality of the synchronization manager.
+ */
 class SyncronizationManagerTest extends SuluTestCase
 {
     /**
@@ -55,9 +59,9 @@ class SyncronizationManagerTest extends SuluTestCase
     }
 
     /**
-     * 1. Route documents are not automatically synced via. the subscriber.
+     * Route documents are not automatically synced via. the subscriber.
      */
-    public function testAutomaticSync()
+    public function testNotAutomaticallySynced()
     {
         $page = $this->createPage([
             'title' => 'Foobar',
@@ -75,7 +79,7 @@ class SyncronizationManagerTest extends SuluTestCase
     }
 
     /**
-     * 2. When a page is moved, it MUST also be moved in the TDM.
+     * When a page is moved, it MUST also be moved in the TDM.
      */
     public function testMovePageInTdm()
     {
@@ -102,7 +106,7 @@ class SyncronizationManagerTest extends SuluTestCase
     }
 
     /**
-     * 3. When a page is deleted, it MUST also be removed from the TDM.
+     * When a page is deleted, it MUST also be removed from the TDM.
      */
     public function testPageDeleted()
     {
@@ -128,8 +132,8 @@ class SyncronizationManagerTest extends SuluTestCase
     }
 
     /**
-     * 4. When a page is deleted from the SDM, any properties referencing this
-     *    page from the TDM should be removed.
+     * When a page is deleted from the SDM, any properties referencing this
+     * page from the TDM should be removed.
      */
     public function testRemoveReferences()
     {
@@ -166,7 +170,7 @@ class SyncronizationManagerTest extends SuluTestCase
     }
 
     /**
-     * 5. Routes must not be automatically synced.
+     * Routes must not be automatically synced.
      */
     public function testRoutesNotSynced()
     {
@@ -190,7 +194,7 @@ class SyncronizationManagerTest extends SuluTestCase
     }
 
     /**
-     * 7. Any referring routes which exist in the TDM and do not exist in the SDM should be deleted from the TDM.
+     * Any referring routes which exist in the TDM and do not exist in the SDM should be deleted from the TDM.
      */
     public function testSyncPageWithDeletedRoutes()
     {
@@ -234,7 +238,7 @@ class SyncronizationManagerTest extends SuluTestCase
     }
 
     /**
-     * 9. Pages push must cascade to any related routes and the route-referrers of those routes.
+     * Pages push must cascade to any related routes and the route-referrers of those routes.
      */
     public function testPushCascade()
     {
@@ -302,10 +306,11 @@ class SyncronizationManagerTest extends SuluTestCase
     }
 
     /**
-     * It should publish documents that have been moved in the default document manager.
+     * Snippets (not being mapped) should be automatically created, updated, moved and deleted.
      */
-    public function testMovedInDefault()
+    public function testSnippets()
     {
+        $this->markTestSkipped('todo');
     }
 
     private function createPage($data)
