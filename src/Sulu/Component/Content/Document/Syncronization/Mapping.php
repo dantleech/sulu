@@ -65,13 +65,6 @@ class Mapping
 
     private function addClassMapping($classFqn, array $config)
     {
-        if (isset($this->classMapping[$classFqn])) {
-            throw new \InvalidArgumentException(sprintf(
-                'Class mapping already exists for class "%s"',
-                $classFqn
-            ));
-        }
-
         $this->classMapping[$classFqn] = $config;
     }
 
