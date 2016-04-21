@@ -294,7 +294,7 @@ class ContentMapperSnippetTest extends SuluTestCase
 
     /**
      * @expectedException Sulu\Component\DocumentManager\Exception\DocumentNotFoundException
-     * @expectedExceptionMessage Requested document of type "page" but got
+     * @expectedExceptionMessage [default] Requested document of type "page" but got
      */
     public function testUpdatePageWrongType()
     {

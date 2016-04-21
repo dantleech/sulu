@@ -112,13 +112,15 @@ class SuluContentExtension extends Extension implements PrependExtensionInterfac
         $loader->load('document.xml');
         $loader->load('serializer.xml');
 
-        $this->processSynchronize($container, $config, $loader);
+        if ($config['synchronize']['enabled']) {
+            $this->processSynchronize($container, $config['synchronize'], $loader);
+        }
     }
 
     private function processSynchronize(ContainerBuilder $container, $config, LoaderInterface $loader)
     {
         $invalidClasses = [];
-        foreach ($config['synchronize']['mapping'] as $classFqn => $mapping) {
+        foreach ($config['mapping'] as $classFqn => $mapping) {
             // TODO: Also ensure that "primary" synchronization documents implement
             //       the SynchronizeBehavior
             if (!class_exists($classFqn)) {
@@ -141,9 +143,9 @@ class SuluContentExtension extends Extension implements PrependExtensionInterfac
             ));
         }
 
-        $container->setParameter('sulu.content.document.synchronization.document_manager', $config['synchronize']['target_document_manager']);
-        $container->setParameter('sulu.content.document.synchronization.auto_sync', $config['synchronize']['default_mapping']['auto_sync']);
-        $container->setParameter('sulu.content.document.synchronization.mapping', $config['synchronize']['mapping']);
+        $container->setParameter('sulu.content.document.synchronization.document_manager', $config['target_document_manager']);
+        $container->setParameter('sulu.content.document.synchronization.auto_sync', $config['default_mapping']['auto_sync']);
+        $container->setParameter('sulu.content.document.synchronization.mapping', $config['mapping']);
         $loader->load('document_synchronize.xml');
     }
 
