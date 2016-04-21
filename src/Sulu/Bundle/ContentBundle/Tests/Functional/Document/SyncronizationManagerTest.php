@@ -156,6 +156,8 @@ class SyncronizationManagerTest extends SuluTestCase
         $this->manager->remove($page);
         $this->manager->flush();
 
+        // the system would crash if it didn't remove the reference above, as
+        // it is a hard reference.
         $this->assertFalse(
             $this->publishDocumentManager->getNodeManager()->has($page->getPath()),
             'Remove has been propagated to the PDM'
@@ -167,7 +169,23 @@ class SyncronizationManagerTest extends SuluTestCase
      */
     public function testRoutesNotSynced()
     {
-        $this->markTestSkipped('todo');
+        $page = $this->createPage([
+            'title' => 'Foobar',
+            'integer' => 1234,
+        ]);
+
+        $this->manager->persist($page, 'de');
+        $this->manager->flush();
+
+        $this->assertTrue(
+            $this->manager->getNodeManager()->has('/cmf/sulu_io/routes/de/foo'),
+            'Route exists in default manager'
+        );
+
+        $this->assertFalse(
+            $this->publishDocumentManager->getNodeManager()->has('/cmf/sulu_io/routes/de/foo'),
+            'Route does not exist in publish manager'
+        );
     }
 
     /**
