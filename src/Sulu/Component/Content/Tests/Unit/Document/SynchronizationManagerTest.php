@@ -23,7 +23,10 @@ use Sulu\Component\Content\Document\SynchronizationManager;
 use Sulu\Component\Content\Document\Syncronization\DocumentRegistrator;
 use Sulu\Component\DocumentManager\Behavior\Mapping\LocaleBehavior;
 use Sulu\Component\DocumentManager\DocumentManagerInterface;
+use Sulu\Component\DocumentManager\NodeManager;
 use Sulu\Bundle\ContentBundle\Document\PageDocument;
+use Sulu\Component\Content\Document\Syncronization\Mapping;
+
 
 /**
  * Abbreviations:.
@@ -80,8 +83,18 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
         $this->ddmInspector = $this->prophesize(DocumentInspector::class);
         $this->ddmNode1 = $this->prophesize(NodeInterface::class);
         $this->ddmNode2 = $this->prophesize(NodeInterface::class);
+        $this->mapping = $this->prophesize(Mapping::class);
+        $this->nodeManager = $this->prophesize(NodeManager::class);
 
         $this->ddm->getInspector()->willReturn($this->ddmInspector->reveal());
+
+        $this->syncManager = new SynchronizationManager(
+            $this->managerRegistry->reveal(),
+            $this->propertyEncoder->reveal(),
+            'live',
+            $this->mapping->reveal(),
+            $this->registrator->reveal()
+        );
     }
 
     /**
@@ -101,6 +114,7 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
         $this->ddmInspector->getNode($document)->willReturn($this->ddmNode1->reveal());
 
         $this->propertyEncoder->systemName(SynchronizeBehavior::SYNCED_FIELD)->shouldBeCalled();
+        $this->registrator->registerDocumentWithPDM($document)->shouldBeCalled();
         $this->pdm->persist(
             $document,
             'fr',
@@ -109,13 +123,16 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
             ]
         )->shouldBeCalled();
 
-        $this->createSyncManager()->synchronize($document);
+        $this->syncManager->synchronize($document);
     }
 
 
     /**
-     * It should return early if publish manager and default manager are
+     * It should throw an exception if publish manager and default manager are
      * the same.
+     *
+     * @expectedException \RuntimeException
+     * @expectedExceptionMessage Published and default managers are the same instance.
      */
     public function testSynchronizeFullPublishAndDefaultManagersAreSame()
     {
@@ -124,7 +141,7 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
 
         $this->pdm->persist(Argument::cetera())->shouldNotBeCalled();
 
-        $this->createSyncManager()->synchronize(new TestDocument([]));
+        $this->syncManager->synchronize(new TestDocument([]));
     }
 
     /**
@@ -133,6 +150,12 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
     public function testSynchronizeRoutes()
     {
         $document = new TestDocument();
+
+        $this->mapping->getCascadeReferrers($document)->willReturn([
+            RouteDocument::class
+        ]);
+        $this->mapping->getCascadeReferrers($this->route1->reveal())->willReturn([
+        ]);
 
         $this->managerRegistry->getManager()->willReturn($this->ddm->reveal());
         $this->managerRegistry->getManager('live')->willReturn($this->pdm->reveal());
@@ -154,6 +177,10 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
         $this->ddmInspector->getLocale($this->route1->reveal())->willReturn('fr');
         $this->ddmInspector->getPath($this->route1->reveal())->willReturn('/path/1');
         $this->ddmInspector->getNode($this->route1->reveal())->willReturn($this->ddmNode2->reveal());
+        $this->ddmInspector->getUuid($document)->willReturn('1234');
+
+        $this->pdm->getNodeManager()->willReturn($this->nodeManager->reveal());
+        $this->nodeManager->has('1234')->willReturn(false);
 
         // persist should be called once for both the document and the route object
         $this->pdm->persist($this->route1->reveal(), 'fr', [ 'path' => '/path/1' ])
@@ -161,27 +188,13 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
         $this->pdm->persist($document, 'fr', [ 'path' => '/' ])
             ->shouldBeCalled();
 
+        $this->registrator->registerDocumentWithPDM($document)->shouldBeCalled();
+        $this->registrator->registerDocumentWithPDM($this->route1->reveal())->shouldBeCalled();
+
         $this->pdm->flush()->shouldNotBeCalled();
         $this->ddm->flush()->shouldNotBeCalled();
 
-        $this->createSyncManager([
-            SynchronizeBehavior::class => [
-                RouteDocument::class
-            ]
-        ])->synchronize($document, [ 'cascade' => true ]);
-    }
-
-    /**
-     * It should return early if the default and publish manager are the same.
-     */
-    public function testSameDefaultAndPublishManagers()
-    {
-        $this->managerRegistry->getManager()->willReturn($this->ddm->reveal());
-        $this->managerRegistry->getManager('live')->willReturn($this->ddm->reveal());
-
-        $this->pdm->persist(Argument::cetera())->shouldNotBeCalled();
-
-        $this->createSyncManager()->synchronize(new TestDocument());
+        $this->syncManager->synchronize($document, [ 'cascade' => true ]);
     }
 
     /**
@@ -204,7 +217,7 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
         )->willReturn('foobar');
         $this->ddmNode1->setProperty('foobar', ['live'])->shouldBeCalled();
 
-        $this->createSyncManager()->synchronize($document);
+        $this->syncManager->synchronize($document);
     }
 
     /**
@@ -219,19 +232,22 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
 
         $this->pdm->persist(Argument::cetera())->shouldNotBeCalled();
 
-        $this->createSyncManager()->synchronize($document);
+        $this->syncManager->synchronize($document);
     }
 
-    private function createSyncManager(array $cascadeMap = [])
+    /**
+     * It should remove documents from the TDM.
+     */
+    public function testDocumentRemove()
     {
-        return new SynchronizationManager(
-            $this->managerRegistry->reveal(),
-            $this->propertyEncoder->reveal(),
-            'live',
-            $cascadeMap,
-            $this->registrator->reveal()
-        );
+        $document = new TestDocument();
+        $this->managerRegistry->getManager('live')->willReturn($this->pdm->reveal());
 
+        $this->registrator->registerDocumentWithPDM($document)->shouldBeCalled();
+        $this->pdm->remove($document)->shouldBeCalled();
+        $this->pdm->flush()->shouldBeCalled();
+
+        $this->syncManager->remove($document, ['flush' => true]);
     }
 }
 

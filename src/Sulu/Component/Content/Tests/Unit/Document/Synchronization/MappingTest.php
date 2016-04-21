@@ -21,24 +21,11 @@ class MappingTest extends \PHPUnit_Framework_TestCase
      */
     public function testAddClassMapping()
     {
-        $mapping = $this->createMapping();
-        $mapping->addClassMapping(\stdClass::class, [
+        $mapping = $this->createMapping([], [
+            \stdClass::class => []
         ]);
-        $this->assertTrue($mapping->isMapped(\stdClass::class));
-        $this->assertFalse($mapping->isMapped('foobar'));
-    }
-
-    /**
-     * It should throw an exception when trying to re-register a mapping.
-     *
-     * @expectedException \InvalidArgumentException
-     * @expectedExceptionMessage Class mapping already exists
-     */
-    public function testAlreadyExistsMapping()
-    {
-        $mapping = $this->createMapping();
-        $mapping->addClassMapping(\stdClass::class, []);
-        $mapping->addClassMapping(\stdClass::class, []);
+        $this->assertTrue($mapping->isMapped(new \stdClass()));
+        $this->assertFalse($mapping->isMapped(new \ArrayObject()));
     }
 
     /**
@@ -48,11 +35,12 @@ class MappingTest extends \PHPUnit_Framework_TestCase
      */
     public function testAutoSyncPolicy($expectedResult, $class, array $policy, $context, array $defaultAutoSync = [], $defaultCascade = [])
     {
-        $mapping = $this->createMapping($defaultAutoSync, $defaultCascade);
-        $mapping->addClassMapping(\stdClass::class, [
-            'auto_sync' => [
-                'create',
-                'update',
+        $mapping = $this->createMapping($defaultAutoSync, [
+            \stdClass::class => [
+                'auto_sync' => [
+                    'create',
+                    'update',
+                ]
             ]
         ]);
 
@@ -118,23 +106,21 @@ class MappingTest extends \PHPUnit_Framework_TestCase
      */
     public function testGetCascade()
     {
-        $mapping = $this->createMapping();
-        $mapping->addClassMapping(
-            \stdClass::class,
-            [
+        $mapping = $this->createMapping([], [
+            \stdClass::class => [
                 'cascade_referrers' => [
                     'FooClass',
                 ]
             ]
-        );
+        ]);
 
         $this->assertEquals([
             'FooClass',
-        ], $mapping->getCascadeReferrers(\stdClass::class));
+        ], $mapping->getCascadeReferrers(new \stdClass));
     }
 
-    private function createMapping($defaultAutoSync = [])
+    private function createMapping($defaultAutoSync = [], $classMapping = [])
     {
-        return new Mapping($defaultAutoSync);
+        return new Mapping($defaultAutoSync, $classMapping);
     }
 }

@@ -20,6 +20,7 @@ use Sulu\Component\DocumentManager\Event\RemoveEvent;
 use Sulu\Component\DocumentManager\Metadata;
 use Sulu\Component\DocumentManager\MetadataFactoryInterface;
 use Sulu\Component\DocumentManager\Event\MoveEvent;
+use Sulu\Component\Content\Document\Syncronization\Mapping;
 
 class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
 {
@@ -69,10 +70,12 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
         parent::setUp();
         $this->syncManager = $this->prophesize(SynchronizationManager::class);
         $this->publishManager = $this->prophesize(DocumentManagerInterface::class);
+        $this->mapping = $this->prophesize(Mapping::class);
 
         $this->subscriber = new DocumentSynchronizationSubscriber(
             $this->manager->reveal(),
-            $this->syncManager->reveal()
+            $this->syncManager->reveal(),
+            $this->mapping->reveal()
         );
         $this->document = $this->prophesize(SynchronizeBehavior::class);
         $this->inspector = $this->prophesize(DocumentInspector::class);
@@ -95,7 +98,8 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
     {
         $subscriber = new DocumentSynchronizationSubscriber(
             $this->prophesize(DocumentManagerInterface::class)->reveal(),
-            $this->syncManager->reveal()
+            $this->syncManager->reveal(),
+            $this->mapping->reveal()
         );
         $this->publishManager->flush()->shouldNotBeCalled();
 
@@ -186,9 +190,8 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
      */
     public function testRemove()
     {
-        $this->publishManager->remove($this->document->reveal())->shouldBeCalled();
-        $this->manager->flush()->shouldNotBeCalled();
-        $this->publishManager->flush()->shouldBeCalled();
+        $this->mapping->hasAutoSyncPolicy($this->document->reveal(), ['delete'])->willReturn(true);
+        $this->syncManager->remove($this->document->reveal())->shouldBeCalled();
 
         $this->subscriber->handleRemove($this->removeEvent->reveal());
         $this->subscriber->handleFlush($this->flushEvent->reveal());
