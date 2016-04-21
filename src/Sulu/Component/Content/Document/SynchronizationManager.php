@@ -122,7 +122,7 @@ class SynchronizationManager
 
         $this->assertDifferentManagerInstances($defaultManager, $publishManager);
 
-        if ($options['force'] || $this->isDocumentSynchronized($document)) {
+        if (false === $options['force'] && $this->isDocumentSynchronized($document)) {
             return;
         }
 
@@ -222,8 +222,13 @@ class SynchronizationManager
             return;
         }
 
-        $referrers = $this->registry->getManager()->getInspector()->getReferrers($document);
+        $defaultManager = $this->registry->getManager();
+        $publishManager = $this->getPublishDocumentManager();
+
+        $referrers = $defaultManager->getInspector()->getReferrers($document);
+        $sourceReferrerOoids = [];
         foreach ($referrers as $referrer) {
+            $sourceReferrerOoids[] = spl_object_hash($referrer);
             foreach ($cascadeFqns as $cascadeFqn) {
                 // if the referrer does not an instance of the mapped cascade
                 // class, continue.
@@ -234,6 +239,22 @@ class SynchronizationManager
                 $options['flush'] = false;
                 $this->synchronize($referrer, $options);
             }
+        }
+
+        $uuid = $defaultManager->getInspector()->getUuid($document);
+
+        if (false === $publishManager->getNodeManager()->has($uuid)) {
+            return;
+        }
+
+        $referrers = $publishManager->getInspector()->getReferrers($document);
+
+        foreach ($referrers as $referrer) {
+            if (in_array(spl_object_hash($referrer), $sourceReferrerOoids)) {
+                continue;
+            }
+
+            $this->remove($referrer);
         }
     }
 
