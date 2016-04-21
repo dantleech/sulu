@@ -14,6 +14,7 @@ namespace Sulu\Bundle\ContentBundle\Tests\Functional\Document;
 use Sulu\Bundle\ContentBundle\Document\PageDocument;
 use Sulu\Bundle\TestBundle\Testing\SuluTestCase;
 use PHPCR\PropertyType;
+use Sulu\Bundle\ContentBundle\Document\RouteDocument;
 
 class SyncronizationManagerTest extends SuluTestCase
 {
@@ -189,19 +190,47 @@ class SyncronizationManagerTest extends SuluTestCase
     }
 
     /**
-     * 6. Pages MUST be immediately deleted from the TDM when deleted from the SDM.
-     */
-    public function testDeletePage()
-    {
-        $this->markTestSkipped('todo');
-    }
-
-    /**
      * 7. Any referring routes which exist in the TDM and do not exist in the SDM should be deleted from the TDM.
      */
     public function testSyncPageWithDeletedRoutes()
     {
-        $this->markTestSkipped('todo');
+        $page = $this->createPage([
+            'title' => 'Foobar',
+            'integer' => 1234,
+        ]);
+
+        $this->manager->persist($page, 'de');
+        $this->manager->flush();
+        $this->syncManager->synchronize($page, [ 'flush' => true, 'cascade' => true ]);
+
+        $route1 = $this->manager->create('route');
+        $route1->setTargetDocument($page);
+        $route1->setHistory(true);
+
+        $this->publishDocumentManager->persist(
+            $route1,
+            null,
+            [
+                'path' => '/cmf/sulu_io/routes/de/foobar'
+            ]
+        );
+        $this->publishDocumentManager->flush();
+
+        $this->assertTrue(
+            $this->publishDocumentManager->getNodeManager()->has('/cmf/sulu_io/routes/de/foobar'),
+            'Route exists in publish document manager'
+        );
+        $this->assertFalse(
+            $this->manager->getNodeManager()->has('/cmf/sulu_io/routes/de/foobar'),
+            'Route does not exist in default manager'
+        );
+
+        $this->syncManager->synchronize($page, [ 'force' => true, 'flush' => true, 'cascade' => true ]);
+
+        $this->assertFalse(
+            $this->publishDocumentManager->getNodeManager()->has('/cmf/sulu_io/routes/de/foobar'),
+            'Route has been removed from publish manager'
+        );
     }
 
     /**
