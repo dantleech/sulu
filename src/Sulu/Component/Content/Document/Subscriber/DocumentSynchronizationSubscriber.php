@@ -178,10 +178,8 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
             return;
         }
 
-        throw new \BadMethodCallException(
-            'Direct move not yet supported'
-        );
-
+        $this->clearSynchronizedManagers($event, $document);
+        $this->syncManager->synchronize($document, [ 'flush' => true ]);
     }
 
     public function handleFlush(FlushEvent $event)
