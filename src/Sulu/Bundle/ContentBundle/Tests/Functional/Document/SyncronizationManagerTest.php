@@ -13,6 +13,7 @@ namespace Sulu\Bundle\ContentBundle\Tests\Functional\Document;
 
 use Sulu\Bundle\ContentBundle\Document\PageDocument;
 use Sulu\Bundle\TestBundle\Testing\SuluTestCase;
+use PHPCR\PropertyType;
 
 class SyncronizationManagerTest extends SuluTestCase
 {
@@ -126,11 +127,38 @@ class SyncronizationManagerTest extends SuluTestCase
     }
 
     /**
-     * 4. When a page is deleted from the SDM, any references to this page from the TDM should be removed.
+     * 4. When a page is deleted from the SDM, any properties referencing this
+     *    page from the TDM should be removed.
      */
     public function testRemoveReferences()
     {
-        $this->markTestSkipped('todo');
+        $page = $this->createPage([
+            'title' => 'Foobar',
+            'integer' => 1234,
+        ]);
+
+        $this->manager->persist($page, 'de');
+        $this->manager->flush();
+
+        $this->syncManager->synchronize($page, [ 'flush' => true, 'cascade' => true ]);
+
+        $this->assertExistsInPublishDocumentManager($page);
+
+        // create a reference property in the PDM
+        $node = $this->publishDocumentManager->getNodeManager()->createPath('/cmf/sulu_io/content/foobar');
+        $node->setProperty(
+            'reference', 
+            $this->manager->getInspector()->getNode($page),
+            PropertyType::REFERENCE
+        );
+
+        $this->manager->remove($page);
+        $this->manager->flush();
+
+        $this->assertFalse(
+            $this->publishDocumentManager->getNodeManager()->has($page->getPath()),
+            'Remove has been propagated to the PDM'
+        );
     }
 
     /**
