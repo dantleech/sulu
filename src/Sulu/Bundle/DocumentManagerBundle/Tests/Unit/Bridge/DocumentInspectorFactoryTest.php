@@ -81,9 +81,14 @@ class DocumentInspectorFactoryTest extends \PHPUnit_Framework_TestCase
         $this->encoder = $this->prophesize(PropertyEncoder::class);
         $this->webspaceManager = $this->prophesize(WebspaceManagerInterface::class);
 
-        $this->manager = $this->prophesize(DocumentManagerInterface::class);
-        $this->manager->getProxyFactory()->willReturn($this->proxyFactory->reveal());
-        $this->manager->getRegistry()->willReturn($this->documentRegistry->reveal());
+        $this->manager1 = $this->prophesize(DocumentManagerInterface::class);
+        $this->manager1->getProxyFactory()->willReturn($this->proxyFactory->reveal());
+        $this->manager1->getRegistry()->willReturn($this->documentRegistry->reveal());
+
+        $this->manager2 = $this->prophesize(DocumentManagerInterface::class);
+        $this->manager2->getProxyFactory()->willReturn($this->proxyFactory->reveal());
+        $this->manager2->getRegistry()->willReturn($this->documentRegistry->reveal());
+
         $this->factory = new DocumentInspectorFactory(
             $this->pathRegistry->reveal(),
             $this->namespaceRegistry->reveal(),
@@ -100,7 +105,7 @@ class DocumentInspectorFactoryTest extends \PHPUnit_Framework_TestCase
      */
     public function testGetInspector()
     {
-        $inspector = $this->factory->getInspector($this->manager->reveal());
+        $inspector = $this->factory->getInspector($this->manager1->reveal());
 
         $this->assertInstanceOf(
             DocumentInspector::class,
@@ -109,7 +114,21 @@ class DocumentInspectorFactoryTest extends \PHPUnit_Framework_TestCase
 
         $this->assertSame(
             $inspector,
-            $this->factory->getInspector($this->manager->reveal())
+            $this->factory->getInspector($this->manager1->reveal())
+        );
+    }
+
+    /**
+     * It should return different instances for different document manager1s.
+     */
+    public function testGetInspectorDifferentInstance()
+    {
+        $inspector1 = $this->factory->getInspector($this->manager1->reveal());
+        $inspector2 = $this->factory->getInspector($this->manager2->reveal());
+
+        $this->assertNotSame(
+            $inspector1,
+            $inspector2
         );
     }
 }
