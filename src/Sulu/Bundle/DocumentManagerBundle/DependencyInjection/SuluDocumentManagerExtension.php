@@ -140,6 +140,7 @@ class SuluDocumentManagerExtension extends Extension implements PrependExtension
             $managerDef = new DefinitionDecorator('sulu_document_manager.abstract_document_manager');
             $managerDef->replaceArgument(0, new Reference($phpcrSessionId));
             $managerDef->replaceArgument(1, new Reference($dispatcherId));
+            $managerDef->addMethodCall('setName', [ $name ]);
             $container->setDefinition($managerId, $managerDef);
             $managerMap[$name] = $managerId;
         }

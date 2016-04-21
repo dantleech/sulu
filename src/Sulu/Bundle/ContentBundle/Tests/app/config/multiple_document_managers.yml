@@ -12,12 +12,13 @@ sulu_content:
                     - Sulu\Bundle\ContentBundle\Document\RouteDocument
             ## route documents
             Sulu\Bundle\ContentBundle\Document\RouteDocument:
-                auto_sync: [ "delete", "move" ]
+                auto_sync: [ ]
                 cascade_referrers:
                     - Sulu\Bundle\ContentBundle\Document\RouteDocument
 
 # Add a live session and document manager to the default configuration
 sulu_document_manager:
+    debug: true
     sessions:
         live:
             backend:
