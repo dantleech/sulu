@@ -119,7 +119,10 @@ class SyncronizationManagerTest extends SuluTestCase
         $this->manager->remove($page);
         $this->manager->flush();
 
-        $this->assertNotExistsInPublishDocumentManager($page);
+        $this->assertFalse(
+            $this->publishDocumentManager->getNodeManager()->has($page->getPath()),
+            'Remove has been propagated to the PDM'
+        );
     }
 
     /**

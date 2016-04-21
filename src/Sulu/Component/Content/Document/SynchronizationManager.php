@@ -12,14 +12,15 @@
 namespace Sulu\Component\Content\Document;
 
 use Sulu\Bundle\ContentBundle\Document\RouteDocument;
-use Sulu\Bundle\DocumentManagerBundle\Bridge\DocumentInspector;use Sulu\Bundle\DocumentManagerBundle\Bridge\DocumentManagerRegistry;
+use Sulu\Bundle\DocumentManagerBundle\Bridge\DocumentInspector;
+use Sulu\Bundle\DocumentManagerBundle\Bridge\DocumentManagerRegistry;
 use Sulu\Bundle\DocumentManagerBundle\Bridge\PropertyEncoder;
 use Sulu\Component\Content\Document\Behavior\ResourceSegmentBehavior;
 use Sulu\Component\Content\Document\Behavior\SynchronizeBehavior;
 use Sulu\Component\Content\Document\Syncronization\DocumentRegistrator;
 use Sulu\Component\DocumentManager\Behavior\Mapping\LocaleBehavior;
-use Sulu\Component\DocumentManager\DocumentManagerRegistryInterface;
 use Sulu\Component\Content\Document\Syncronization\Mapping;
+use Sulu\Component\DocumentManager\DocumentManagerInterface;
 
 /**
  * The synchronization manager handles the synchronization of documents
@@ -119,21 +120,9 @@ class SynchronizationManager
         $defaultManager = $this->registry->getManager();
         $publishManager = $this->getPublishDocumentManager();
 
-        // if the publish manager and default manager are the same, then there is nothing to do here.
-        // NOTE: Should we throw an exception here? as we will introduce the ability to completely disable
-        //       this feature.
-        if ($publishManager === $defaultManager) {
-            return;
-        }
+        $this->assertDifferentManagerInstances($defaultManager, $publishManager);
 
-        // get the list of managers with which the document is already
-        // synchronized (the value may be NULL as we have no control over what
-        // the user does with this mapped value).
-        $synced = $document->getSynchronizedManagers() ?: [];
-
-        // unless forced, we will not process documents which are already
-        // synced with the publish document manager.
-        if (false === $options['force'] && in_array($this->publishManagerName, $synced)) {
+        if ($options['force'] || $this->isDocumentSynchronized($document)) {
             return;
         }
 
@@ -210,6 +199,21 @@ class SynchronizationManager
         }
     }
 
+    public function remove($document, array $options = [])
+    {
+        $options = array_merge([
+            'flush' => false,
+        ], $options);
+
+        $publishManager = $this->getPublishDocumentManager();
+        $this->registrator->registerDocumentWithPDM($document);
+        $publishManager->remove($document);
+
+        if ($options['flush']) {
+            $publishManager->flush();
+        }
+    }
+
     private function cascadeRelations($document, array $options)
     {
         $cascadeFqns = $this->mapping->getCascadeReferrers($document);
@@ -242,5 +246,31 @@ class SynchronizationManager
         $reflection = new \ReflectionClass(get_class($document));
 
         return $reflection->isSubclassOf($classFqn);
+    }
+
+    private function isDocumentSynchronized($document)
+    {
+        // get the list of managers with which the document is already
+        // synchronized (the value may be NULL as we have no control over what
+        // the user does with this mapped value).
+        $synced = $document->getSynchronizedManagers() ?: [];
+
+        // unless forced, we will not process documents which are already
+        // synced with the publish document manager.
+        return in_array($this->publishManagerName, $synced);
+    }
+
+    private function assertDifferentManagerInstances(DocumentManagerInterface $manager1, DocumentManagerInterface $manager2)
+    {
+        // if the publish manager and default manager are the same, then there is nothing to do here.
+        // NOTE: Should we throw an exception here? as we will introduce the ability to completely disable
+        //       this feature.
+        if ($manager1=== $manager2) {
+            throw new \RuntimeException(
+                'Published and default managers are the same instance. You must ' .
+                'either configure different instances or ' .  'disable document ' .
+                'synchronization.'
+            );
+        }
     }
 }

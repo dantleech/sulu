@@ -92,6 +92,7 @@ class DocumentRegistrator
         $ddmInspector = $this->defaultManager->getInspector();
         $pdmRegistry = $this->publishManager->getRegistry();
 
+
         // if the PDM registry already has the document, then
         // there is nothing to do - the document manager will
         // handle the rest.
