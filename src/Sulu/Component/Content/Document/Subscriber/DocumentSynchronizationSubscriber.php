@@ -159,6 +159,7 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
             return;
         }
 
+        // TODO: Do not queue docuemnts that are already queued for removal.
         $this->removeQueue[] = $document;
     }
 
