@@ -111,7 +111,7 @@ class SuluDocumentManagerExtension extends Extension implements PrependExtension
 
     private function configureDocumentManagers(array $config, ContainerBuilder $container)
     {
-        // set the default document manager
+        // set the source document manager
         $defaultManager = $config['default_manager'];
         $container->setParameter('sulu_document_manager.default_manager', $defaultManager);
 

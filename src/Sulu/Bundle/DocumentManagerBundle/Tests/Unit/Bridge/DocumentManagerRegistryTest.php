@@ -49,7 +49,7 @@ class DocumentManagerRegistryTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * It should return the default document manager name.
+     * It should return the source document manager name.
      */
     public function testGetDefaultName()
     {
@@ -58,7 +58,7 @@ class DocumentManagerRegistryTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * It should return the default document managre if no argument given.
+     * It should return the source document managre if no argument given.
      */
     public function testGetDefaultManager()
     {

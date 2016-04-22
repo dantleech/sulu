@@ -31,8 +31,8 @@ use Sulu\Component\Content\Document\Syncronization\Mapping;
 /**
  * Abbreviations:.
  *
- * - PDM: Publish document manager.
- * - DDM: Default document manager.
+ * - TDM: Publish document manager.
+ * - SDM: Default document manager.
  */
 class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
 {
@@ -98,8 +98,8 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * It should synchronize a document to the publish document manager.
-     * It should register the fact that the document is synchronized with the PDM.
+     * It should synchronize a document to the target document manager.
+     * It should register the fact that the document is synchronized with the TDM.
      * It should NOT localize the PHPCR property for a non-localized document.
      */
     public function testPublish()
@@ -114,7 +114,7 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
         $this->ddmInspector->getNode($document)->willReturn($this->ddmNode1->reveal());
 
         $this->propertyEncoder->systemName(SynchronizeBehavior::SYNCED_FIELD)->shouldBeCalled();
-        $this->registrator->registerDocumentWithPDM($document)->shouldBeCalled();
+        $this->registrator->registerDocumentWithTDM($document)->shouldBeCalled();
         $this->pdm->persist(
             $document,
             'fr',
@@ -123,16 +123,16 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
             ]
         )->shouldBeCalled();
 
-        $this->syncManager->synchronize($document);
+        $this->syncManager->push($document);
     }
 
 
     /**
-     * It should throw an exception if publish manager and default manager are
+     * It should throw an exception if target manager and source manager are
      * the same.
      *
      * @expectedException \RuntimeException
-     * @expectedExceptionMessage Published and default managers are the same instance.
+     * @expectedExceptionMessage Published and source managers are the same instance.
      */
     public function testSynchronizeFullPublishAndDefaultManagersAreSame()
     {
@@ -141,7 +141,7 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
 
         $this->pdm->persist(Argument::cetera())->shouldNotBeCalled();
 
-        $this->syncManager->synchronize(new TestDocument([]));
+        $this->syncManager->push(new TestDocument([]));
     }
 
     /**
@@ -188,13 +188,13 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
         $this->pdm->persist($document, 'fr', [ 'path' => '/' ])
             ->shouldBeCalled();
 
-        $this->registrator->registerDocumentWithPDM($document)->shouldBeCalled();
-        $this->registrator->registerDocumentWithPDM($this->route1->reveal())->shouldBeCalled();
+        $this->registrator->registerDocumentWithTDM($document)->shouldBeCalled();
+        $this->registrator->registerDocumentWithTDM($this->route1->reveal())->shouldBeCalled();
 
         $this->pdm->flush()->shouldNotBeCalled();
         $this->ddm->flush()->shouldNotBeCalled();
 
-        $this->syncManager->synchronize($document, [ 'cascade' => true ]);
+        $this->syncManager->push($document, [ 'cascade' => true ]);
     }
 
     /**
@@ -217,7 +217,7 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
         )->willReturn('foobar');
         $this->ddmNode1->setProperty('foobar', ['live'])->shouldBeCalled();
 
-        $this->syncManager->synchronize($document);
+        $this->syncManager->push($document);
     }
 
     /**
@@ -232,7 +232,7 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
 
         $this->pdm->persist(Argument::cetera())->shouldNotBeCalled();
 
-        $this->syncManager->synchronize($document);
+        $this->syncManager->push($document);
     }
 
     /**
@@ -243,7 +243,7 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
         $document = new TestDocument();
         $this->managerRegistry->getManager('live')->willReturn($this->pdm->reveal());
 
-        $this->registrator->registerDocumentWithPDM($document)->shouldBeCalled();
+        $this->registrator->registerDocumentWithTDM($document)->shouldBeCalled();
         $this->pdm->remove($document)->shouldBeCalled();
         $this->pdm->flush()->shouldBeCalled();
 
