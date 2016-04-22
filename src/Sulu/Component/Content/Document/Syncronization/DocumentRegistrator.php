@@ -24,24 +24,6 @@ use Sulu\Component\DocumentManager\DocumentManagerInterface;
 class DocumentRegistrator
 {
     /**
-     * @var DocumentManagerInterface
-     */
-    private $sourceManager;
-
-    /**
-     * @var DocumentManagerInterface
-     */
-    private $targetManager;
-
-    public function __construct(
-        DocumentManagerInterface $sourceManager,
-        DocumentManagerInterface $targetManager
-    ) {
-        $this->sourceManager = $sourceManager;
-        $this->targetManager = $targetManager;
-    }
-
-    /**
      * Register the incoming SDM document with any existing PHPCR node in the
      * TDM.
      *
@@ -54,11 +36,15 @@ class DocumentRegistrator
      *
      * @param SynchronizeBehavior $document
      */
-    public function registerDocumentWithTDM(SynchronizeBehavior $document)
+    public function registerDocumentWithTDM(
+        SynchronizeBehavior $document, 
+        DocumentManagerInterface $sourceManager, 
+        DocumentManagerInterface $targetManager
+    )
     {
-        $this->registerSingleDocumentWithTDM($document);
+        $this->registerSingleDocumentWithTDM($document, $sourceManager, $targetManager);
 
-        $metadata = $this->sourceManager->getMetadataFactory()->getMetadataForClass(get_class($document));
+        $metadata = $sourceManager->getMetadataFactory()->getMetadataForClass(get_class($document));
         // iterate over the field mappings for the document, if they resolve to
         // an object then try and register it with the TDM.
         foreach (array_keys($metadata->getFieldMappings()) as $field) {
@@ -71,56 +57,59 @@ class DocumentRegistrator
             // if the source document manager does not have this object then it is
             // not a candidate for being persisted (e.g. it might be a \DateTime
             // object).
-            if (false === $this->sourceManager->getRegistry()->hasDocument($propertyValue)) {
+            if (false === $sourceManager->getRegistry()->hasDocument($propertyValue)) {
                 continue;
             }
 
-            $this->registerSingleDocumentWithTDM($propertyValue);
+            $this->registerSingleDocumentWithTDM($propertyValue, $sourceManager, $targetManager);
         }
 
         // TODO: Workaround for the fact that "parent" is not in the metadata,
         // see: https://github.com/sulu-io/sulu-document-manager/issues/67
         if ($document instanceof ParentBehavior) {
             if ($parent = $document->getParent()) {
-                $this->registerSingleDocumentWithTDM($parent, true);
+                $this->registerSingleDocumentWithTDM($parent, $sourceManager, $targetManager, true);
             }
         }
     }
 
-    private function registerSingleDocumentWithTDM($document, $create = false)
+    private function registerSingleDocumentWithTDM(
+        $document, 
+        DocumentManagerInterface $sourceManager,
+        DocumentManagerInterface $targetManager,
+        $create = false
+    )
     {
-        $ddmInspector = $this->sourceManager->getInspector();
-        $pdmRegistry = $this->targetManager->getRegistry();
-
+        $sdmInspector = $sourceManager->getInspector();
+        $tdmRegistry = $targetManager->getRegistry();
 
         // if the TDM registry already has the document, then
         // there is nothing to do - the document manager will
         // handle the rest.
-        if (true === $pdmRegistry->hasDocument($document)) {
+        if (true === $tdmRegistry->hasDocument($document)) {
             return;
         }
-
         // see if we can resolve the corresponding node in the TDM.
         // if we cannot then we either return and let the document
         // manager create the new node, or, if $create is true, create
         // the missing node (this happens when registering a document
         // which is a relation to the incoming SDM document).
-        if (false === $uuid = $this->resolveTDMUUID($document)) {
+        if (false === $uuid = $this->resolveTDMUUID($document, $sourceManager, $targetManager)) {
             if (false === $create) {
                 return;
             }
 
-            $this->targetManager->getNodeManager()->createPath(
-                $ddmInspector->getPath($document), $ddmInspector->getUuid($document)
+            $targetManager->getNodeManager()->createPath(
+                $sdmInspector->getPath($document), $sdmInspector->getUuid($document)
             );
 
             return;
         }
 
         // register the SDM document against the TDM PHPCR node.
-        $node = $this->targetManager->getNodeManager()->find($uuid);
-        $locale = $ddmInspector->getLocale($document);
-        $pdmRegistry->registerDocument(
+        $node = $targetManager->getNodeManager()->find($uuid);
+        $locale = $sdmInspector->getLocale($document);
+        $tdmRegistry->registerDocument(
             $document,
             $node,
             $locale
@@ -146,26 +135,26 @@ class DocumentRegistrator
      * @throws \RuntimeException If the UUID could not be resolved and it would be
      *                           invalid to implicitly allow the node to be created.
      */
-    private function resolveTDMUUID($object)
+    private function resolveTDMUUID($object, $sourceManager, $targetManager)
     {
-        $pdmNodeManager = $this->targetManager->getNodeManager();
-        $ddmInspector = $this->sourceManager->getInspector();
-        $uuid = $ddmInspector->getUUid($object);
+        $tdmNodeManager = $targetManager->getNodeManager();
+        $sdmInspector = $sourceManager->getInspector();
+        $uuid = $sdmInspector->getUUid($object);
 
-        if (true === $pdmNodeManager->has($uuid)) {
+        if (true === $tdmNodeManager->has($uuid)) {
             return $uuid;
         }
 
-        $path = $ddmInspector->getPath($object);
+        $path = $sdmInspector->getPath($object);
 
-        if (false === $pdmNodeManager->has($path)) {
+        if (false === $tdmNodeManager->has($path)) {
 
             // if the parent path also does not exist in the TDM then we need
             // to create the parent path using the same UUIDs that are used in
             // the SDM.
             $parentPath = PathHelper::getParentPath($path);
-            if (false === $pdmNodeManager->has($parentPath)) {
-                $this->syncTDMPath($parentPath);
+            if (false === $tdmNodeManager->has($parentPath)) {
+                $this->syncTDMPath($parentPath, $sourceManager, $targetManager);
 
                 return false;
             }
@@ -176,7 +165,7 @@ class DocumentRegistrator
         throw new \RuntimeException(sprintf(
             'Publish document manager already has a node at path "%s" but ' .
             'incoming UUID `%s` does not match existing UUID: "%s".',
-            $path, $uuid, $pdmNodeManager->find($path)->getIdentifier()
+            $path, $uuid, $tdmNodeManager->find($path)->getIdentifier()
         ));
     }
 
@@ -186,10 +175,10 @@ class DocumentRegistrator
      *
      * @param string $path
      */
-    private function syncTDMPath($path)
+    private function syncTDMPath($path, $sourceManager, $targetManager)
     {
-        $ddmNodeManager = $this->sourceManager->getNodeManager();
-        $pdmNodeManager = $this->targetManager->getNodeManager();
+        $sdmNodeManager = $sourceManager->getNodeManager();
+        $tdmNodeManager = $targetManager->getNodeManager();
         $segments = explode('/', $path);
         $stack = [];
 
@@ -201,8 +190,8 @@ class DocumentRegistrator
             }
 
             $path = implode('/', $stack) ?: '/';
-            $ddmNode = $ddmNodeManager->find($path);
-            $pdmNodeManager->createPath($path, $ddmNode->getIdentifier());
+            $sdmNode = $sdmNodeManager->find($path);
+            $tdmNodeManager->createPath($path, $sdmNode->getIdentifier());
         }
 
         // jackalope, at time of writing, will not register the UUID against
@@ -210,6 +199,6 @@ class DocumentRegistrator
         // reference it by UUID until the session is flushed.
         //
         // upstream fix: https://github.com/jackalope/jackalope/pull/307
-        $pdmNodeManager->save();
+        $tdmNodeManager->save();
     }
 }

@@ -31,7 +31,7 @@ use Sulu\Component\Content\Document\Syncronization\Mapping;
 /**
  * Abbreviations:.
  *
- * - TDM: Publish document manager.
+ * - TDM: Push document manager.
  * - SDM: Default document manager.
  */
 class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
@@ -49,7 +49,7 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
     /**
      * @var DocumentManagerInterface
      */
-    private $ddm;
+    private $sdm;
 
     /**
      * @var DocumentRegistrator
@@ -59,34 +59,34 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
     /**
      * @var DocumentManagerInterface
      */
-    private $pdm;
+    private $tdm;
 
     /**
      * @var DocumentInspector
      */
-    private $ddmInspector;
+    private $sdmInspector;
 
     /**
      * @var NodeInterface
      */
-    private $ddmNode1;
+    private $sdmNode1;
 
     public function setUp()
     {
         $this->managerRegistry = $this->prophesize(DocumentManagerRegistry::class);
         $this->propertyEncoder = $this->prophesize(PropertyEncoder::class);
         $this->registrator = $this->prophesize(DocumentRegistrator::class);
-        $this->ddm = $this->prophesize(DocumentManagerInterface::class);
-        $this->pdm = $this->prophesize(DocumentManagerInterface::class);
+        $this->sdm = $this->prophesize(DocumentManagerInterface::class);
+        $this->tdm = $this->prophesize(DocumentManagerInterface::class);
         $this->route1 = $this->prophesize(RouteDocument::class)
             ->willImplement(SynchronizeBehavior::class);
-        $this->ddmInspector = $this->prophesize(DocumentInspector::class);
-        $this->ddmNode1 = $this->prophesize(NodeInterface::class);
-        $this->ddmNode2 = $this->prophesize(NodeInterface::class);
+        $this->sdmInspector = $this->prophesize(DocumentInspector::class);
+        $this->sdmNode1 = $this->prophesize(NodeInterface::class);
+        $this->sdmNode2 = $this->prophesize(NodeInterface::class);
         $this->mapping = $this->prophesize(Mapping::class);
         $this->nodeManager = $this->prophesize(NodeManager::class);
 
-        $this->ddm->getInspector()->willReturn($this->ddmInspector->reveal());
+        $this->sdm->getInspector()->willReturn($this->sdmInspector->reveal());
 
         $this->syncManager = new SynchronizationManager(
             $this->managerRegistry->reveal(),
@@ -102,23 +102,28 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
      * It should register the fact that the document is synchronized with the TDM.
      * It should NOT localize the PHPCR property for a non-localized document.
      */
-    public function testPublish()
+    public function testPush()
     {
         $document = new TestDocument([]);
 
-        $this->managerRegistry->getManager()->willReturn($this->ddm->reveal());
-        $this->managerRegistry->getManager('live')->willReturn($this->pdm->reveal());
+        $this->managerRegistry->getManager()->willReturn($this->sdm->reveal());
+        $this->managerRegistry->getManager('live')->willReturn($this->tdm->reveal());
 
-        $this->ddmInspector->getLocale($document)->willReturn('fr');
-        $this->ddmInspector->getPath($document)->willReturn('/path/1');
-        $this->ddmInspector->getNode($document)->willReturn($this->ddmNode1->reveal());
+        $this->sdmInspector->getLocale($document)->willReturn('fr');
+        $this->sdmInspector->getPath($document)->willReturn('/path/1');
+        $this->sdmInspector->getNode($document)->willReturn($this->sdmNode1->reveal());
 
         $this->propertyEncoder->systemName(SynchronizeBehavior::SYNCED_FIELD)->shouldBeCalled();
-        $this->registrator->registerDocumentWithTDM($document)->shouldBeCalled();
-        $this->pdm->persist(
+        $this->registrator->registerDocumentWithTDM(
+            $document,
+            $this->sdm->reveal(),
+            $this->tdm->reveal()
+        )->shouldBeCalled();
+        $this->tdm->persist(
             $document,
             'fr',
             [
+                'safe' => true,
                 'path' => '/path/1',
             ]
         )->shouldBeCalled();
@@ -132,14 +137,14 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
      * the same.
      *
      * @expectedException \RuntimeException
-     * @expectedExceptionMessage Published and source managers are the same instance.
+     * @expectedExceptionMessage Target and source managers are the same instance.
      */
-    public function testSynchronizeFullPublishAndDefaultManagersAreSame()
+    public function testSynchronizeFullPushAndDefaultManagersAreSame()
     {
-        $this->managerRegistry->getManager()->willReturn($this->ddm->reveal());
-        $this->managerRegistry->getManager('live')->willReturn($this->ddm->reveal());
+        $this->managerRegistry->getManager()->willReturn($this->sdm->reveal());
+        $this->managerRegistry->getManager('live')->willReturn($this->sdm->reveal());
 
-        $this->pdm->persist(Argument::cetera())->shouldNotBeCalled();
+        $this->tdm->persist(Argument::cetera())->shouldNotBeCalled();
 
         $this->syncManager->push(new TestDocument([]));
     }
@@ -157,42 +162,50 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
         $this->mapping->getCascadeReferrers($this->route1->reveal())->willReturn([
         ]);
 
-        $this->managerRegistry->getManager()->willReturn($this->ddm->reveal());
-        $this->managerRegistry->getManager('live')->willReturn($this->pdm->reveal());
+        $this->managerRegistry->getManager()->willReturn($this->sdm->reveal());
+        $this->managerRegistry->getManager('live')->willReturn($this->tdm->reveal());
 
         // return one route and one stdClass (the stdClass should be filtered)
-        $this->ddmInspector->getReferrers($document)->willReturn([
+        $this->sdmInspector->getReferrers($document)->willReturn([
             $this->route1->reveal(),
             new \stdClass(),
         ]);
-        $this->ddmInspector->getReferrers($this->route1->reveal())->willReturn([]);
+        $this->sdmInspector->getReferrers($this->route1->reveal())->willReturn([]);
 
         // neither document nor route are currently synchronized
         $this->route1->getSynchronizedManagers()->willReturn([]);
 
-        $this->ddmInspector->getLocale($document)->willReturn('fr');
-        $this->ddmInspector->getPath($document)->willReturn('/');
-        $this->ddmInspector->getNode($document)->willReturn($this->ddmNode1->reveal());
+        $this->sdmInspector->getLocale($document)->willReturn('fr');
+        $this->sdmInspector->getPath($document)->willReturn('/');
+        $this->sdmInspector->getNode($document)->willReturn($this->sdmNode1->reveal());
 
-        $this->ddmInspector->getLocale($this->route1->reveal())->willReturn('fr');
-        $this->ddmInspector->getPath($this->route1->reveal())->willReturn('/path/1');
-        $this->ddmInspector->getNode($this->route1->reveal())->willReturn($this->ddmNode2->reveal());
-        $this->ddmInspector->getUuid($document)->willReturn('1234');
+        $this->sdmInspector->getLocale($this->route1->reveal())->willReturn('fr');
+        $this->sdmInspector->getPath($this->route1->reveal())->willReturn('/path/1');
+        $this->sdmInspector->getNode($this->route1->reveal())->willReturn($this->sdmNode2->reveal());
+        $this->sdmInspector->getUuid($document)->willReturn('1234');
 
-        $this->pdm->getNodeManager()->willReturn($this->nodeManager->reveal());
+        $this->tdm->getNodeManager()->willReturn($this->nodeManager->reveal());
         $this->nodeManager->has('1234')->willReturn(false);
 
         // persist should be called once for both the document and the route object
-        $this->pdm->persist($this->route1->reveal(), 'fr', [ 'path' => '/path/1' ])
+        $this->tdm->persist($this->route1->reveal(), 'fr', [ 'safe' => true, 'path' => '/path/1' ])
             ->shouldBeCalled();
-        $this->pdm->persist($document, 'fr', [ 'path' => '/' ])
+        $this->tdm->persist($document, 'fr', [ 'safe' => true, 'path' => '/' ])
             ->shouldBeCalled();
 
-        $this->registrator->registerDocumentWithTDM($document)->shouldBeCalled();
-        $this->registrator->registerDocumentWithTDM($this->route1->reveal())->shouldBeCalled();
+        $this->registrator->registerDocumentWithTDM(
+            $document,
+            $this->sdm->reveal(),
+            $this->tdm->reveal()
+        )->shouldBeCalled();
+        $this->registrator->registerDocumentWithTDM(
+            $this->route1->reveal(),
+            $this->sdm->reveal(),
+            $this->tdm->reveal()
+        )->shouldBeCalled();
 
-        $this->pdm->flush()->shouldNotBeCalled();
-        $this->ddm->flush()->shouldNotBeCalled();
+        $this->tdm->flush()->shouldNotBeCalled();
+        $this->sdm->flush()->shouldNotBeCalled();
 
         $this->syncManager->push($document, [ 'cascade' => true ]);
     }
@@ -203,19 +216,19 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
     public function testLocalizedPhpcrSyncedProperty()
     {
         $document = new LocalizedTestDocument([], 'fr');
-        $this->managerRegistry->getManager()->willReturn($this->ddm->reveal());
-        $this->managerRegistry->getManager('live')->willReturn($this->pdm->reveal());
+        $this->managerRegistry->getManager()->willReturn($this->sdm->reveal());
+        $this->managerRegistry->getManager('live')->willReturn($this->tdm->reveal());
 
-        $this->ddmInspector->getLocale($document)->willReturn('fr');
-        $this->ddmInspector->getPath($document)->willReturn('/path/1');
-        $this->ddmInspector->getNode($document)->willReturn($this->ddmNode1->reveal());
+        $this->sdmInspector->getLocale($document)->willReturn('fr');
+        $this->sdmInspector->getPath($document)->willReturn('/path/1');
+        $this->sdmInspector->getNode($document)->willReturn($this->sdmNode1->reveal());
 
-        $this->pdm->persist(Argument::cetera())->shouldBeCalled();
+        $this->tdm->persist(Argument::cetera())->shouldBeCalled();
         $this->propertyEncoder->localizedSystemName(
             SynchronizeBehavior::SYNCED_FIELD,
             'fr'
         )->willReturn('foobar');
-        $this->ddmNode1->setProperty('foobar', ['live'])->shouldBeCalled();
+        $this->sdmNode1->setProperty('foobar', ['live'])->shouldBeCalled();
 
         $this->syncManager->push($document);
     }
@@ -227,10 +240,10 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
     public function testDocumentBelievesItIsSynchronizedNoForce()
     {
         $document = new TestDocument(['live']);
-        $this->managerRegistry->getManager()->willReturn($this->ddm->reveal());
-        $this->managerRegistry->getManager('live')->willReturn($this->pdm->reveal());
+        $this->managerRegistry->getManager()->willReturn($this->sdm->reveal());
+        $this->managerRegistry->getManager('live')->willReturn($this->tdm->reveal());
 
-        $this->pdm->persist(Argument::cetera())->shouldNotBeCalled();
+        $this->tdm->persist(Argument::cetera())->shouldNotBeCalled();
 
         $this->syncManager->push($document);
     }
@@ -241,11 +254,16 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
     public function testDocumentRemove()
     {
         $document = new TestDocument();
-        $this->managerRegistry->getManager('live')->willReturn($this->pdm->reveal());
+        $this->managerRegistry->getManager()->willReturn($this->sdm->reveal());
+        $this->managerRegistry->getManager('live')->willReturn($this->tdm->reveal());
 
-        $this->registrator->registerDocumentWithTDM($document)->shouldBeCalled();
-        $this->pdm->remove($document)->shouldBeCalled();
-        $this->pdm->flush()->shouldBeCalled();
+        $this->registrator->registerDocumentWithTDM(
+            $document,
+            $this->sdm->reveal(),
+            $this->tdm->reveal()
+        )->shouldBeCalled();
+        $this->tdm->remove($document)->shouldBeCalled();
+        $this->tdm->flush()->shouldBeCalled();
 
         $this->syncManager->remove($document, ['flush' => true]);
     }
