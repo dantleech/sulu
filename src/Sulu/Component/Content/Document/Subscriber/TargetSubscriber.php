@@ -17,6 +17,8 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
  * Document which has another document as a target.
+ *
+ * TODO: This is wrong, it should be mapped (content != target)
  */
 class TargetSubscriber implements EventSubscriberInterface
 {

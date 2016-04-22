@@ -79,7 +79,7 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
         );
         $this->document = $this->prophesize(SynchronizeBehavior::class);
         $this->inspector = $this->prophesize(DocumentInspector::class);
-        $this->syncManager->getPublishDocumentManager()->willReturn($this->publishManager->reveal());
+        $this->syncManager->getTargetDocumentManager()->willReturn($this->publishManager->reveal());
         $this->removeEvent = $this->prophesize(RemoveEvent::class);
         $this->removeEvent->getDocument()->willReturn($this->document->reveal());
         $this->removeEvent->getManager()->willReturn($this->manager->reveal());
@@ -89,10 +89,10 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
     }
 
     /**
-     * It should do nothing if the default manager is not registered to the default document manager.
+     * It should do nothing if the source manager is not registered to the source document manager.
      *
      * @expectedException \RuntimeException
-     * @expectedExceptionMessage The document syncronization subscriber must only be registered to the default document manager
+     * @expectedExceptionMessage The document syncronization subscriber must only be registered to the source document manager
      */
     public function testDoNothingNotDefaultManager()
     {
@@ -135,7 +135,7 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
 
         $this->manager->flush()->shouldBeCalled();
         $this->publishManager->flush()->shouldBeCalled();
-        $this->syncManager->synchronize($this->document->reveal(), [ 'cascade' => true ])->shouldBeCalled();
+        $this->syncManager->push($this->document->reveal(), [ 'cascade' => true ])->shouldBeCalled();
 
         $this->subscriber->handlePersist($this->persistEvent->reveal());
         $this->subscriber->handleFlush($this->flushEvent->reveal());
@@ -159,7 +159,7 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
 
         $this->manager->flush()->shouldBeCalled();
         $this->publishManager->flush()->shouldBeCalled();
-        $this->syncManager->synchronize($this->document->reveal(), [ 'cascade' => true ])->shouldBeCalled();
+        $this->syncManager->push($this->document->reveal(), [ 'cascade' => true ])->shouldBeCalled();
 
         $this->subscriber->handlePersist($this->persistEvent->reveal());
         $this->subscriber->handleFlush($this->flushEvent->reveal());
@@ -167,7 +167,7 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
 
     /**
      * It should NOT persist a document with a not-new PHPCR node.
-     * It should add the name of the PDM to the synced property of the document.
+     * It should add the name of the TDM to the synced property of the document.
      */
     public function testSyncOld()
     {
@@ -186,7 +186,7 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
     }
 
     /**
-     * It should remove documents from the PDM that are removed in the PDM.
+     * It should remove documents from the TDM that are removed in the TDM.
      */
     public function testRemove()
     {

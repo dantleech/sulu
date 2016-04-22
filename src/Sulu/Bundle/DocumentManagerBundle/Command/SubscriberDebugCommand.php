@@ -26,13 +26,24 @@ class SubscriberDebugCommand extends ContainerAwareCommand
     {
         $this->setName('sulu:document:subscriber:debug');
         $this->addArgument('event_name', InputArgument::OPTIONAL, 'Event name, without the sulu_document_manager. prefix');
+        $this->addArgument('manager_name', InputArgument::OPTIONAL, 'Name of document manager');
         $this->setDescription('Show event listeners associated with the document manager');
     }
 
     public function execute(InputInterface $input, OutputInterface $output)
     {
         $eventName = $input->getArgument('event_name');
-        $dispatcher = $this->getContainer()->get('sulu_document_manager.event_dispatcher');
+        $managerName = $input->getArgument('manager_name');
+        $registry = $this->getContainer()->get('sulu_document_manager.registry');
+
+        if (null === $managerName) {
+            $manager = $registry->getManager();
+        } else {
+            $manager = $registry->getManager($managerName);
+        }
+
+        $dispatcher = $manager->getEventDispatcher();
+
 
         if (!$eventName) {
             return $this->showEventNames($output);
@@ -41,6 +52,7 @@ class SubscriberDebugCommand extends ContainerAwareCommand
         $eventName = self::PREFIX . $eventName;
         $listeners = $dispatcher->getListeners($eventName);
 
+        $rows = [];
         foreach ($listeners as $listenerTuple) {
             list($listener, $methodName) = $listenerTuple;
             $refl = new \ReflectionClass(get_class($listener));

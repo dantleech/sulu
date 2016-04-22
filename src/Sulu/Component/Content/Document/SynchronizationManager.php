@@ -26,7 +26,7 @@ use Sulu\Component\DocumentManager\DocumentManagerInterface;
  * The synchronization manager handles the synchronization of documents
  * from the DEFAULT document manger to the PUBLISH document manager.
  *
- * NOTE: In the future multiple publish document managers may be supported.
+ * NOTE: In the future multiple target document managers may be supported.
  */
 class SynchronizationManager
 {
@@ -43,7 +43,7 @@ class SynchronizationManager
     /**
      * @var string
      */
-    private $publishManagerName;
+    private $targetManagerName;
 
     /**
      * @var DocumentRegistrator
@@ -58,43 +58,48 @@ class SynchronizationManager
     public function __construct(
         DocumentManagerRegistry $registry,
         PropertyEncoder $encoder,
-        $publishManagerName,
+        $targetManagerName,
         Mapping $mapping,
         $registrator = null
     ) {
         $this->registry = $registry;
-        $this->publishManagerName = $publishManagerName;
+        $this->targetManagerName = $targetManagerName;
         $this->encoder = $encoder;
         $this->mapping = $mapping;
         $this->registrator = $registrator ?: new DocumentRegistrator(
             $registry->getManager(),
-            $registry->getManager($this->publishManagerName)
+            $registry->getManager($this->targetManagerName)
         );
     }
 
     /**
-     * Return the publish document manager (PDM).
+     * Return the target document manager (TDM).
      *
-     * This should be the only class that is aware of the PDM name. By having
-     * this method we can be sure that whatever the PDM is, the PDM is always
-     * the PDM.
+     * This should be the only class that is aware of the TDM name. By having
+     * this method we can be sure that whatever the TDM is, the TDM is always
+     * the TDM.
      *
      * NOTE: This is used only by the synchronization subscriber in order
-     *       to "flush" the PDM.
+     *       to "flush" the TDM.
      *
      * @return DocumentManagerInterface
      */
-    public function getPublishDocumentManager()
+    public function getTargetDocumentManager()
     {
-        return $this->registry->getManager($this->publishManagerName);
+        return $this->registry->getManager($this->targetManagerName);
+    }
+
+    public function getDefaultDocumentManager()
+    {
+        return $this->registry->getManager();
     }
 
     /**
-     * Synchronize a single document to the publish document manager in the
+     * Push a single document to the target document manager in the
      * documents currently registered locale.
      *
-     * FLUSH will not be called and no associated documents will be
-     * synchronized.
+     * By default "flush" will not be called and no associated documents will be
+     * cascaded.
      *
      * Options:
      *
@@ -104,12 +109,50 @@ class SynchronizationManager
      * - `flush`  : Flush both document managers after synchronization (as the calling
      *              code may not have access to them).
      *
-     * TODO: Add an explicit "locale" option?
+     * @param SynchronizeBehavior $document
+     * @param array $options
+     */
+    public function push(SynchronizeBehavior $document, array $options = [])
+    {
+        $sourceManager = $this->registry->getManager();
+        $targetManager = $this->registry->getManager($this->targetManagerName);
+
+        $this->synchronize($document, $sourceManager, $targetManager, $options);
+    }
+
+    /**
+     * Pull a single document from the target document manager in the
+     * documents currently registered locale.
+     *
+     * By default "flush" will not be called and no associated documents will be
+     * cascaded.
+     *
+     * Options:
+     *
+     * - `force`  : Force the synchronization, do not skip if the system thinks
+     *              the target document is already synchronized.
+     * - `cascade`: Cascade the synchronization to any configured relations.
+     * - `flush`  : Flush both document managers after synchronization (as the calling
+     *              code may not have access to them).
      *
      * @param SynchronizeBehavior $document
-     * @param bool $force
+     * @param array $options
      */
-    public function synchronize(SynchronizeBehavior $document, array $options = [])
+    public function pull(SynchronizeBehavior $document, array $options = [])
+    {
+        $defaultManager = $this->getDefaultDocumentManager();
+        $targetManager = $this->getTargetDocumentManager();
+
+        $locale = $defaultManager->getInspector()->getLocale($document);
+        $uuid = $defaultManager->getInspector()->getUuid($document);
+
+        // load the document in the target state
+        $targetManager->find($uuid, $locale);
+
+        $this->synchronize($document, $targetManager, $defaultManager, $options);
+    }
+
+    private function synchronize(SynchronizeBehavior $document, $sourceManager, $targetManager, array $options = [])
     {
         $options = array_merge([
             'force' => false,
@@ -117,37 +160,36 @@ class SynchronizationManager
             'flush' => false,
         ], $options);
 
-        $defaultManager = $this->registry->getManager();
-        $publishManager = $this->getPublishDocumentManager();
-
-        $this->assertDifferentManagerInstances($defaultManager, $publishManager);
+        $this->assertDifferentManagerInstances($sourceManager, $targetManager);
 
         if (false === $options['force'] && $this->isDocumentSynchronized($document)) {
             return;
         }
 
-        $inspector = $defaultManager->getInspector();
+        $inspector = $sourceManager->getInspector();
         $locale = $inspector->getLocale($document);
         $path = $inspector->getPath($document);
 
-        // register the DDM document and its immediate relations with the PDM
+        // register the SDM document and its immediate relations with the TDM
         // PHPCR node.
-        $this->registrator->registerDocumentWithPDM($document);
+        $this->registrator->registerDocumentWithTDM($document, $sourceManager, $targetManager);
 
         // save the document with the "publish" document manager.
-        $publishManager->persist(
+        $targetManager->persist(
             $document,
             $locale,
             [
+                'safe' => true,
                 'path' => $path,
             ]
         );
         // the document is now synchronized with the publish workspace...
 
         if ($options['cascade']) {
-            $this->cascadeRelations($document, $options);
+            $this->cascadeRelations($document, $sourceManager, $targetManager, $options);
         }
 
+        // TODO: This only applies on PULL
         // add the document manager name to the list of synchronized
         // document managers directly on the PHPCR node.
         //
@@ -159,7 +201,7 @@ class SynchronizationManager
         //       it rather than leak localization behavior here, however this is
         //       currently a heavy operation due to the content system and lack of a
         //       UOW.
-        $synced[] = $this->publishManagerName;
+        $synced[] = $this->targetManagerName;
 
         // only store unique values: if the sync was forced, then the document
         // may already have the target manager name in its list of synched
@@ -194,27 +236,41 @@ class SynchronizationManager
         $property->setValue($document, $synced);
 
         if ($options['flush']) {
-            $defaultManager->flush();
-            $publishManager->flush();
+            $sourceManager->flush();
+            $targetManager->flush();
         }
     }
 
     public function remove($document, array $options = [])
     {
+        $sourceManager = $this->getDefaultDocumentManager();
+        $targetManager = $this->getTargetDocumentManager();
+
+        return $this->doRemove($document, $sourceManager, $targetManager, $options);
+    }
+
+    private function doRemove($document, $sourceManager, $targetManager, array $options)
+    {
         $options = array_merge([
             'flush' => false,
         ], $options);
 
-        $publishManager = $this->getPublishDocumentManager();
-        $this->registrator->registerDocumentWithPDM($document);
-        $publishManager->remove($document);
+        // Flush the target manager.
+        //
+        // TODO: This should not be necessary, but without it jackalope seems
+        //       to have some state problems, possibly related to:
+        //       https://github.com/jackalope/jackalope/pull/309
+        $targetManager->flush();
+
+        $this->registrator->registerDocumentWithTDM($document, $sourceManager, $targetManager);
+        $targetManager->remove($document);
 
         if ($options['flush']) {
-            $publishManager->flush();
+            $targetManager->flush();
         }
     }
 
-    private function cascadeRelations($document, array $options)
+    private function cascadeRelations($document, $sourceManager, $targetManager, array $options)
     {
         $cascadeFqns = $this->mapping->getCascadeReferrers($document);
 
@@ -222,10 +278,7 @@ class SynchronizationManager
             return;
         }
 
-        $defaultManager = $this->registry->getManager();
-        $publishManager = $this->getPublishDocumentManager();
-
-        $referrers = $defaultManager->getInspector()->getReferrers($document);
+        $referrers = $sourceManager->getInspector()->getReferrers($document);
         $sourceReferrerOoids = [];
         foreach ($referrers as $referrer) {
             $sourceReferrerOoids[] = spl_object_hash($referrer);
@@ -237,24 +290,24 @@ class SynchronizationManager
                 }
 
                 $options['flush'] = false;
-                $this->synchronize($referrer, $options);
+                $this->synchronize($referrer, $sourceManager, $targetManager, $options);
             }
         }
 
-        $uuid = $defaultManager->getInspector()->getUuid($document);
+        $uuid = $sourceManager->getInspector()->getUuid($document);
 
-        if (false === $publishManager->getNodeManager()->has($uuid)) {
+        if (false === $targetManager->getNodeManager()->has($uuid)) {
             return;
         }
 
-        $referrers = $publishManager->getInspector()->getReferrers($document);
+        $referrers = $targetManager->getInspector()->getReferrers($document);
 
         foreach ($referrers as $referrer) {
             if (in_array(spl_object_hash($referrer), $sourceReferrerOoids)) {
                 continue;
             }
 
-            $this->remove($referrer);
+            $this->doRemove($referrer, $sourceManager, $targetManager, []);
         }
     }
 
@@ -277,18 +330,15 @@ class SynchronizationManager
         $synced = $document->getSynchronizedManagers() ?: [];
 
         // unless forced, we will not process documents which are already
-        // synced with the publish document manager.
-        return in_array($this->publishManagerName, $synced);
+        // synced with the target document manager.
+        return in_array($this->targetManagerName, $synced);
     }
 
     private function assertDifferentManagerInstances(DocumentManagerInterface $manager1, DocumentManagerInterface $manager2)
     {
-        // if the publish manager and default manager are the same, then there is nothing to do here.
-        // NOTE: Should we throw an exception here? as we will introduce the ability to completely disable
-        //       this feature.
         if ($manager1=== $manager2) {
             throw new \RuntimeException(
-                'Published and default managers are the same instance. You must ' .
+                'Target and source managers are the same instance. You must ' .
                 'either configure different instances or ' .  'disable document ' .
                 'synchronization.'
             );

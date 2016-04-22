@@ -110,7 +110,7 @@ class SynchronizeCommand extends Command
                 $this->defaultManager->find($inspector->getUuid($document), $locale);
 
                 try {
-                    $this->syncManager->synchronize($document, [
+                    $this->syncManager->push($document, [
                         'force' => $force,
                     ]);
                     $synced = $document->getSynchronizedManagers() ?: [];
@@ -130,10 +130,10 @@ class SynchronizeCommand extends Command
             }
         }
 
-        $output->write('Flushing publish document manager:');
+        $output->write('Flushing target document manager:');
         $this->syncManager->getPublishDocumentManager()->flush();
         $output->writeln(' [<info>OK</>]');
-        $output->write('Flushing default document manager:');
+        $output->write('Flushing source document manager:');
         $this->defaultManager->flush();
         $output->writeln(' [<info>OK</>]');
         $output->writeln(sprintf('%d/%d documents syncronized (inc. localizations)', $syncedCount, $documentCount));

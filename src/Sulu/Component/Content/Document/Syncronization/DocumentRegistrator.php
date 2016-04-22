@@ -17,36 +17,18 @@ use Sulu\Component\DocumentManager\Behavior\Mapping\ParentBehavior;
 use Sulu\Component\DocumentManager\DocumentManagerInterface;
 
 /**
- * Class responsible for registering a document from the default document manager
- * with the publish document manager including any documents dependent on
+ * Class responsible for registering a document from the source document manager
+ * with the target document manager including any documents dependent on
  * the document to be synchronized.
  */
 class DocumentRegistrator
 {
     /**
-     * @var DocumentManagerInterface
-     */
-    private $defaultManager;
-
-    /**
-     * @var DocumentManagerInterface
-     */
-    private $publishManager;
-
-    public function __construct(
-        DocumentManagerInterface $defaultManager,
-        DocumentManagerInterface $publishManager
-    ) {
-        $this->defaultManager = $defaultManager;
-        $this->publishManager = $publishManager;
-    }
-
-    /**
-     * Register the incoming DDM document with any existing PHPCR node in the
-     * PDM.
+     * Register the incoming SDM document with any existing PHPCR node in the
+     * TDM.
      *
-     * If the PDM already has the incoming PHPCR node then we need to register
-     * the existing PHPCR node from the PDM PHPCR session with the incoming DDM
+     * If the TDM already has the incoming PHPCR node then we need to register
+     * the existing PHPCR node from the TDM PHPCR session with the incoming SDM
      * document (otherwise the system will attempt to create a new document and
      * fail).
      *
@@ -54,13 +36,17 @@ class DocumentRegistrator
      *
      * @param SynchronizeBehavior $document
      */
-    public function registerDocumentWithPDM(SynchronizeBehavior $document)
+    public function registerDocumentWithTDM(
+        SynchronizeBehavior $document, 
+        DocumentManagerInterface $sourceManager, 
+        DocumentManagerInterface $targetManager
+    )
     {
-        $this->registerSingleDocumentWithPDM($document);
+        $this->registerSingleDocumentWithTDM($document, $sourceManager, $targetManager);
 
-        $metadata = $this->defaultManager->getMetadataFactory()->getMetadataForClass(get_class($document));
+        $metadata = $sourceManager->getMetadataFactory()->getMetadataForClass(get_class($document));
         // iterate over the field mappings for the document, if they resolve to
-        // an object then try and register it with the PDM.
+        // an object then try and register it with the TDM.
         foreach (array_keys($metadata->getFieldMappings()) as $field) {
             $propertyValue = $metadata->getFieldValue($document, $field);
 
@@ -68,59 +54,62 @@ class DocumentRegistrator
                 continue;
             }
 
-            // if the default document manager does not have this object then it is
+            // if the source document manager does not have this object then it is
             // not a candidate for being persisted (e.g. it might be a \DateTime
             // object).
-            if (false === $this->defaultManager->getRegistry()->hasDocument($propertyValue)) {
+            if (false === $sourceManager->getRegistry()->hasDocument($propertyValue)) {
                 continue;
             }
 
-            $this->registerSingleDocumentWithPDM($propertyValue);
+            $this->registerSingleDocumentWithTDM($propertyValue, $sourceManager, $targetManager);
         }
 
         // TODO: Workaround for the fact that "parent" is not in the metadata,
         // see: https://github.com/sulu-io/sulu-document-manager/issues/67
         if ($document instanceof ParentBehavior) {
             if ($parent = $document->getParent()) {
-                $this->registerSingleDocumentWithPDM($parent, true);
+                $this->registerSingleDocumentWithTDM($parent, $sourceManager, $targetManager, true);
             }
         }
     }
 
-    private function registerSingleDocumentWithPDM($document, $create = false)
+    private function registerSingleDocumentWithTDM(
+        $document, 
+        DocumentManagerInterface $sourceManager,
+        DocumentManagerInterface $targetManager,
+        $create = false
+    )
     {
-        $ddmInspector = $this->defaultManager->getInspector();
-        $pdmRegistry = $this->publishManager->getRegistry();
+        $sdmInspector = $sourceManager->getInspector();
+        $tdmRegistry = $targetManager->getRegistry();
 
-
-        // if the PDM registry already has the document, then
+        // if the TDM registry already has the document, then
         // there is nothing to do - the document manager will
         // handle the rest.
-        if (true === $pdmRegistry->hasDocument($document)) {
+        if (true === $tdmRegistry->hasDocument($document)) {
             return;
         }
-
-        // see if we can resolve the corresponding node in the PDM.
+        // see if we can resolve the corresponding node in the TDM.
         // if we cannot then we either return and let the document
         // manager create the new node, or, if $create is true, create
         // the missing node (this happens when registering a document
-        // which is a relation to the incoming DDM document).
-        if (false === $uuid = $this->resolvePDMUUID($document)) {
+        // which is a relation to the incoming SDM document).
+        if (false === $uuid = $this->resolveTDMUUID($document, $sourceManager, $targetManager)) {
             if (false === $create) {
                 return;
             }
 
-            $this->publishManager->getNodeManager()->createPath(
-                $ddmInspector->getPath($document), $ddmInspector->getUuid($document)
+            $targetManager->getNodeManager()->createPath(
+                $sdmInspector->getPath($document), $sdmInspector->getUuid($document)
             );
 
             return;
         }
 
-        // register the DDM document against the PDM PHPCR node.
-        $node = $this->publishManager->getNodeManager()->find($uuid);
-        $locale = $ddmInspector->getLocale($document);
-        $pdmRegistry->registerDocument(
+        // register the SDM document against the TDM PHPCR node.
+        $node = $targetManager->getNodeManager()->find($uuid);
+        $locale = $sdmInspector->getLocale($document);
+        $tdmRegistry->registerDocument(
             $document,
             $node,
             $locale
@@ -128,13 +117,13 @@ class DocumentRegistrator
     }
 
     /**
-     * If possible, resolve the UUID of the node in the PDM corresponding to
-     * the DDM node.
+     * If possible, resolve the UUID of the node in the TDM corresponding to
+     * the SDM node.
      *
      * If the UUID does not exist, we check to see if the path exsits.
-     * if neither the path or UUID exist, then the PDM should create a new
+     * if neither the path or UUID exist, then the TDM should create a new
      * document and we ensure that the PARENT path exists and if it doesn't
-     * we syncronize the ancestor nodes from the DDM.
+     * we syncronize the ancestor nodes from the SDM.
      *
      * We return FALSE in the case that a new document should be created.
      *
@@ -146,26 +135,26 @@ class DocumentRegistrator
      * @throws \RuntimeException If the UUID could not be resolved and it would be
      *                           invalid to implicitly allow the node to be created.
      */
-    private function resolvePDMUUID($object)
+    private function resolveTDMUUID($object, $sourceManager, $targetManager)
     {
-        $pdmNodeManager = $this->publishManager->getNodeManager();
-        $ddmInspector = $this->defaultManager->getInspector();
-        $uuid = $ddmInspector->getUUid($object);
+        $tdmNodeManager = $targetManager->getNodeManager();
+        $sdmInspector = $sourceManager->getInspector();
+        $uuid = $sdmInspector->getUUid($object);
 
-        if (true === $pdmNodeManager->has($uuid)) {
+        if (true === $tdmNodeManager->has($uuid)) {
             return $uuid;
         }
 
-        $path = $ddmInspector->getPath($object);
+        $path = $sdmInspector->getPath($object);
 
-        if (false === $pdmNodeManager->has($path)) {
+        if (false === $tdmNodeManager->has($path)) {
 
-            // if the parent path also does not exist in the PDM then we need
+            // if the parent path also does not exist in the TDM then we need
             // to create the parent path using the same UUIDs that are used in
-            // the DDM.
+            // the SDM.
             $parentPath = PathHelper::getParentPath($path);
-            if (false === $pdmNodeManager->has($parentPath)) {
-                $this->syncPDMPath($parentPath);
+            if (false === $tdmNodeManager->has($parentPath)) {
+                $this->syncTDMPath($parentPath, $sourceManager, $targetManager);
 
                 return false;
             }
@@ -176,20 +165,20 @@ class DocumentRegistrator
         throw new \RuntimeException(sprintf(
             'Publish document manager already has a node at path "%s" but ' .
             'incoming UUID `%s` does not match existing UUID: "%s".',
-            $path, $uuid, $pdmNodeManager->find($path)->getIdentifier()
+            $path, $uuid, $tdmNodeManager->find($path)->getIdentifier()
         ));
     }
 
     /**
-     * Sync the given path from the DDM to the PDM, preserving
+     * Sync the given path from the SDM to the TDM, preserving
      * the UUIDs.
      *
      * @param string $path
      */
-    private function syncPDMPath($path)
+    private function syncTDMPath($path, $sourceManager, $targetManager)
     {
-        $ddmNodeManager = $this->defaultManager->getNodeManager();
-        $pdmNodeManager = $this->publishManager->getNodeManager();
+        $sdmNodeManager = $sourceManager->getNodeManager();
+        $tdmNodeManager = $targetManager->getNodeManager();
         $segments = explode('/', $path);
         $stack = [];
 
@@ -201,8 +190,8 @@ class DocumentRegistrator
             }
 
             $path = implode('/', $stack) ?: '/';
-            $ddmNode = $ddmNodeManager->find($path);
-            $pdmNodeManager->createPath($path, $ddmNode->getIdentifier());
+            $sdmNode = $sdmNodeManager->find($path);
+            $tdmNodeManager->createPath($path, $sdmNode->getIdentifier());
         }
 
         // jackalope, at time of writing, will not register the UUID against
@@ -210,6 +199,6 @@ class DocumentRegistrator
         // reference it by UUID until the session is flushed.
         //
         // upstream fix: https://github.com/jackalope/jackalope/pull/307
-        $pdmNodeManager->save();
+        $tdmNodeManager->save();
     }
 }

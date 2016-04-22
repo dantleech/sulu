@@ -35,7 +35,7 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
     /**
      * @var DocumentManagerInterface
      */
-    private $defaultManager;
+    private $sourceManager;
 
     /**
      * @var object[]
@@ -53,14 +53,14 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
     private $mapping;
 
     /**
-     * NOTE: We pass the default manager here because we need to ensure that we
-     *       only process documents FROM the default manager. If we could assign
+     * NOTE: We pass the source manager here because we need to ensure that we
+     *       only process documents FROM the source manager. If we could assign
      *       event subscribers to specific document managers this would not
      *       be necessary.
      */
-    public function __construct(DocumentManagerInterface $defaultManager, SynchronizationManager $syncManager, Mapping $mapping)
+    public function __construct(DocumentManagerInterface $sourceManager, SynchronizationManager $syncManager, Mapping $mapping)
     {
-        $this->defaultManager = $defaultManager;
+        $this->sourceManager = $sourceManager;
         $this->syncManager = $syncManager;
         $this->mapping = $mapping;
     }
@@ -100,7 +100,7 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
     }
 
     /**
-     * Synchronize new documents with the publish document manager.
+     * Synchronize new documents with the target document manager.
      *
      * @param PersistEvent
      */
@@ -108,12 +108,12 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
     {
         $manager = $event->getManager();
 
-        // do not do anything if the default and publish managers are the same.
-        if ($this->defaultManager === $this->syncManager->getPublishDocumentManager()) {
+        // do not do anything if the default and target managers are the same.
+        if ($this->sourceManager === $this->syncManager->getTargetDocumentManager()) {
             return;
         }
 
-        $this->assertEmittingManagerDefaultManager($manager);
+        $this->assertEmittingManagerSourceManager($manager);
 
         $document = $event->getDocument();
 
@@ -134,7 +134,7 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $inspector = $this->defaultManager->getInspector();
+        $inspector = $this->sourceManager->getInspector();
         $locale = $inspector->getLocale($document);
         $this->persistQueue[] = [
             'document' => $document,
@@ -146,7 +146,7 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
     {
         $manager = $removeEvent->getManager();
 
-        $this->assertEmittingManagerDefaultManager($manager);
+        $this->assertEmittingManagerSourceManager($manager);
 
         $document = $removeEvent->getDocument();
 
@@ -179,7 +179,7 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
         }
 
         $this->clearSynchronizedManagers($event, $document);
-        $this->syncManager->synchronize($document, [ 'flush' => true ]);
+        $this->syncManager->push($document, [ 'flush' => true ]);
     }
 
     public function handleFlush(FlushEvent $event)
@@ -188,14 +188,14 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
             return;
         }
 
-        if ($this->defaultManager === $this->syncManager->getPublishDocumentManager()) {
+        if ($this->sourceManager === $this->syncManager->getTargetDocumentManager()) {
             return;
         }
 
         $manager = $event->getManager();
-        $this->assertEmittingManagerDefaultManager($manager);
+        $this->assertEmittingManagerSourceManager($manager);
 
-        $publishManager = $this->syncManager->getPublishDocumentManager();
+        $targetManager = $this->syncManager->getTargetDocumentManager();
         $defaultFlush = false;
 
         // process the persistQueue, FIFO (first in, first out)
@@ -209,42 +209,42 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
             // we need to load the document in the locale it was persisted in.
             // note that this should not create any significant overhead as all
             // the data is already in-memory.
-            $inspector = $this->defaultManager->getInspector();
+            $inspector = $this->sourceManager->getInspector();
 
             if ($inspector->getLocale($document) !== $locale) {
-                $this->defaultManager->find($inspector->getUUid($document), $locale);
+                $this->sourceManager->find($inspector->getUUid($document), $locale);
             }
 
             // synchronize the document, cascading the synchronization to any
             // configured relations.
-            $this->syncManager->synchronize($document, [ 'cascade' => true ]);
+            $this->syncManager->push($document, [ 'cascade' => true ]);
         }
         while ($entry = array_shift($this->removeQueue)) {
             // NOTE: this will not work when the document is not registeredro
             $this->syncManager->remove($entry);
         }
 
-        // flush both managers. the publish manager will then commit
-        // the synchronized documents and the default manager will update
+        // flush both managers. the target manager will then commit
+        // the synchronized documents and the source manager will update
         // the "synchronized document managers" field of original documents.
-        $publishManager->flush();
+        $targetManager->flush();
 
-        // only flush the default manager when objects have been synchronized (
+        // only flush the source manager when objects have been synchronized (
         // not removed).
         if ($defaultFlush) {
-            $this->defaultManager->flush();
+            $this->sourceManager->flush();
         }
     }
 
-    private function assertEmittingManagerDefaultManager(DocumentManagerInterface $manager)
+    private function assertEmittingManagerSourceManager(DocumentManagerInterface $manager)
     {
         // do nothing, see same condition in handlePersist.
-        if ($manager === $this->defaultManager) {
+        if ($manager === $this->sourceManager) {
             return;
         }
 
         throw new \RuntimeException(
-            'The document syncronization subscriber must only be registered to the default document manager'
+            'The document syncronization subscriber must only be registered to the source document manager'
         );
     }
 

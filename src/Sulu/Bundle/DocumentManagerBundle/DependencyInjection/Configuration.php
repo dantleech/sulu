@@ -71,7 +71,7 @@ class Configuration implements ConfigurationInterface
                     ->end()
                 ->end()
                 ->scalarNode('default_manager')
-                    ->info('Name of the default document manager')
+                    ->info('Name of the source document manager')
                     ->defaultValue('default')
                 ->end()
                 ->arrayNode('sessions')

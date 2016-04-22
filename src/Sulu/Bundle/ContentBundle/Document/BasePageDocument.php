@@ -238,7 +238,7 @@ class BasePageDocument implements
     protected $permissions;
 
     /**
-     * Names of all the non-default document managers to which this document
+     * Names of all the non-source document managers to which this document
      * is synchronized with.
      */
     protected $synchronizedManagers;

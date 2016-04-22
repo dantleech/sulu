@@ -26,20 +26,20 @@ use Sulu\Component\DocumentManager\NodeManager;
 /**
  * Abbreviations:.
  *
- * - PDM: Publish document manager.
- * - DDM: Default document manager.
+ * - TDM: Publish document manager.
+ * - SDM: Default document manager.
  */
 class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
 {
     /**
      * @var DocumentManagerInterface
      */
-    private $pdm;
+    private $tdm;
 
     /**
      * @var DocumentManagerInterface
      */
-    private $ddm;
+    private $sdm;
 
     /**
      * @var DocumentRegistrator
@@ -49,42 +49,42 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
     /**
      * @var DocumentInspector
      */
-    private $ddmInspector;
+    private $sdmInspector;
 
     /**
      * @var DocumentRegistry
      */
-    private $ddmRegistry;
+    private $sdmRegistry;
 
     /**
      * @var DocumentRegistry
      */
-    private $pdmRegistry;
+    private $tdmRegistry;
 
     /**
      * @var NodeManager
      */
-    private $pdmNodeManager;
+    private $tdmNodeManager;
 
     /**
      * @var NodeManager
      */
-    private $ddmNodeManager;
+    private $sdmNodeManager;
 
     /**
      * @var NodeInterface
      */
-    private $ddmNode;
+    private $sdmNode;
 
     /**
      * @var NodeInterface
      */
-    private $ddmNode1;
+    private $sdmNode1;
 
     /**
      * @var NodeInterface
      */
-    private $pdmNode;
+    private $tdmNode;
 
     /**
      * @var SynchronizeBehavior
@@ -108,100 +108,112 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
 
     public function setUp()
     {
-        $this->pdm = $this->prophesize(DocumentManagerInterface::class);
-        $this->ddm = $this->prophesize(DocumentManagerInterface::class);
+        $this->tdm = $this->prophesize(DocumentManagerInterface::class);
+        $this->sdm = $this->prophesize(DocumentManagerInterface::class);
 
         $this->registrator = new DocumentRegistrator(
-            $this->ddm->reveal(),
-            $this->pdm->reveal()
+            $this->sdm->reveal(),
+            $this->tdm->reveal()
         );
 
-        $this->ddmInspector = $this->prophesize(DocumentInspector::class);
-        $this->pdmInspector = $this->prophesize(DocumentInspector::class);
-        $this->ddmRegistry = $this->prophesize(DocumentRegistry::class);
-        $this->pdmRegistry = $this->prophesize(DocumentRegistry::class);
-        $this->pdmNodeManager = $this->prophesize(NodeManager::class);
-        $this->ddmNodeManager = $this->prophesize(NodeManager::class);
-        $this->ddmNode = $this->prophesize(NodeInterface::class);
-        $this->ddmNode1 = $this->prophesize(NodeInterface::class);
-        $this->ddmNode2 = $this->prophesize(NodeInterface::class);
-        $this->pdmNode = $this->prophesize(NodeInterface::class);
+        $this->sdmInspector = $this->prophesize(DocumentInspector::class);
+        $this->tdmInspector = $this->prophesize(DocumentInspector::class);
+        $this->sdmRegistry = $this->prophesize(DocumentRegistry::class);
+        $this->tdmRegistry = $this->prophesize(DocumentRegistry::class);
+        $this->tdmNodeManager = $this->prophesize(NodeManager::class);
+        $this->sdmNodeManager = $this->prophesize(NodeManager::class);
+        $this->sdmNode = $this->prophesize(NodeInterface::class);
+        $this->sdmNode1 = $this->prophesize(NodeInterface::class);
+        $this->sdmNode2 = $this->prophesize(NodeInterface::class);
+        $this->tdmNode = $this->prophesize(NodeInterface::class);
         $this->document = $this->prophesize(SynchronizeBehavior::class);
         $this->document1 = $this->prophesize(SynchronizeBehavior::class);
         $this->metadata = $this->prophesize(Metadata::class);
         $this->metadataFactory = $this->prophesize(MetadataFactoryInterface::class);
 
-        $this->ddm->getMetadataFactory()->willReturn($this->metadataFactory->reveal());
-        $this->ddm->getNodeManager()->willReturn($this->ddmNodeManager->reveal());
-        $this->ddm->getRegistry()->willReturn($this->ddmRegistry->reveal());
-        $this->ddm->getInspector()->willReturn($this->ddmInspector->reveal());
-        $this->pdm->getRegistry()->willReturn($this->pdmRegistry->reveal());
-        $this->pdm->getNodeManager()->willReturn($this->pdmNodeManager->reveal());
+        $this->sdm->getMetadataFactory()->willReturn($this->metadataFactory->reveal());
+        $this->sdm->getNodeManager()->willReturn($this->sdmNodeManager->reveal());
+        $this->sdm->getRegistry()->willReturn($this->sdmRegistry->reveal());
+        $this->sdm->getInspector()->willReturn($this->sdmInspector->reveal());
+        $this->tdm->getRegistry()->willReturn($this->tdmRegistry->reveal());
+        $this->tdm->getNodeManager()->willReturn($this->tdmNodeManager->reveal());
     }
 
     /**
-     * If an equivilent document does not exist in the PDM then it should return.
+     * If an equivilent document does not exist in the TDM then it should return.
      */
     public function testRegisterNewDocumentNotExisting()
     {
         $this->metadataFactory->getMetadataForClass(get_class($this->document->reveal()))
             ->willReturn($this->metadata->reveal());
         $this->metadata->getFieldMappings()->willReturn([]);
-        $this->pdmRegistry->hasDocument($this->document->reveal())->willReturn(false);
-        $this->ddmInspector->getUuid($this->document->reveal())->willReturn('1234');
-        $this->ddmInspector->getPath($this->document->reveal())->willReturn('/path/to');
-        $this->pdmNodeManager->has('1234')->willReturn(false);
-        $this->pdmNodeManager->has('/path/to')->willReturn(false);
-        $this->pdmNodeManager->has('/path')->willReturn(true);
+        $this->tdmRegistry->hasDocument($this->document->reveal())->willReturn(false);
+        $this->sdmInspector->getUuid($this->document->reveal())->willReturn('1234');
+        $this->sdmInspector->getPath($this->document->reveal())->willReturn('/path/to');
+        $this->tdmNodeManager->has('1234')->willReturn(false);
+        $this->tdmNodeManager->has('/path/to')->willReturn(false);
+        $this->tdmNodeManager->has('/path')->willReturn(true);
 
-        $this->ddmInspector->getLocale($this->document->reveal())->willReturn('fr');
-        $this->pdmRegistry->registerDocument(Argument::cetera())->shouldNotBeCalled();
-        $this->pdmNodeManager->find('1234')->willReturn($this->pdmNode->reveal());
+        $this->sdmInspector->getLocale($this->document->reveal())->willReturn('fr');
+        $this->tdmRegistry->registerDocument(Argument::cetera())->shouldNotBeCalled();
+        $this->tdmNodeManager->find('1234')->willReturn($this->tdmNode->reveal());
 
-        $this->registrator->registerDocumentWithPDM($this->document->reveal());
+        $this->registrator->registerDocumentWithTDM(
+            $this->document->reveal(),
+            $this->sdm->reveal(),
+            $this->tdm->reveal()
+        );
     }
 
     /**
-     * It should register a document with an existing node in the PDM.
+     * It should register a document with an existing node in the TDM.
      */
     public function testRegisterNewDocumentUuidExists()
     {
         $this->metadataFactory->getMetadataForClass(get_class($this->document->reveal()))
             ->willReturn($this->metadata->reveal());
         $this->metadata->getFieldMappings()->willReturn([]);
-        $this->pdmRegistry->hasDocument($this->document->reveal())->willReturn(false);
-        $this->ddmInspector->getUuid($this->document->reveal())->willReturn('1234');
-        $this->ddmInspector->getPath($this->document->reveal())->willReturn('/path/to');
-        $this->pdmNodeManager->has('1234')->willReturn(true);
-        $this->pdmNodeManager->find('1234')->willReturn($this->pdmNode->reveal());
+        $this->tdmRegistry->hasDocument($this->document->reveal())->willReturn(false);
+        $this->sdmInspector->getUuid($this->document->reveal())->willReturn('1234');
+        $this->sdmInspector->getPath($this->document->reveal())->willReturn('/path/to');
+        $this->tdmNodeManager->has('1234')->willReturn(true);
+        $this->tdmNodeManager->find('1234')->willReturn($this->tdmNode->reveal());
 
-        $this->ddmInspector->getLocale($this->document->reveal())->willReturn('fr');
-        $this->pdmRegistry->registerDocument(
+        $this->sdmInspector->getLocale($this->document->reveal())->willReturn('fr');
+        $this->tdmRegistry->registerDocument(
             $this->document->reveal(),
-            $this->pdmNode->reveal(),
+            $this->tdmNode->reveal(),
             'fr'
         )->shouldBeCalled();
 
-        $this->registrator->registerDocumentWithPDM($this->document->reveal());
+        $this->registrator->registerDocumentWithTDM(
+            $this->document->reveal(),
+            $this->sdm->reveal(),
+            $this->tdm->reveal()
+        );
     }
 
     /**
-     * If the PDM already has the document then it should return early.
+     * If the TDM already has the document then it should return early.
      */
     public function testRegisterNewDocumentNotHasReturnEarly()
     {
         $this->metadataFactory->getMetadataForClass(get_class($this->document->reveal()))
             ->willReturn($this->metadata->reveal());
         $this->metadata->getFieldMappings()->willReturn([]);
-        $this->pdmRegistry->hasDocument($this->document->reveal())->willReturn(true);
+        $this->tdmRegistry->hasDocument($this->document->reveal())->willReturn(true);
 
-        $this->pdmRegistry->registerDocument(Argument::cetera())->shouldNotBeCalled();
-        $this->registrator->registerDocumentWithPDM($this->document->reveal());
+        $this->tdmRegistry->registerDocument(Argument::cetera())->shouldNotBeCalled();
+        $this->registrator->registerDocumentWithTDM(
+            $this->document->reveal(),
+            $this->sdm->reveal(),
+            $this->tdm->reveal()
+        );
     }
 
     /**
-     * If the UUID and the path, and parent path do not exist in the PDM
-     * then it should recursively create the ancestor nodes from the DDM
+     * If the UUID and the path, and parent path do not exist in the TDM
+     * then it should recursively create the ancestor nodes from the SDM
      * (retaining the same UUIDs).
      */
     public function testNoneOfUuidPathOrParentPathExist()
@@ -209,26 +221,30 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
         $this->metadataFactory->getMetadataForClass(get_class($this->document->reveal()))
             ->willReturn($this->metadata->reveal());
         $this->metadata->getFieldMappings()->willReturn([]);
-        $this->pdmRegistry->hasDocument($this->document->reveal())->willReturn(false);
+        $this->tdmRegistry->hasDocument($this->document->reveal())->willReturn(false);
 
-        $this->ddmInspector->getUuid($this->document->reveal())->willReturn('1234');
-        $this->ddmInspector->getPath($this->document->reveal())->willReturn('/path/to/this');
+        $this->sdmInspector->getUuid($this->document->reveal())->willReturn('1234');
+        $this->sdmInspector->getPath($this->document->reveal())->willReturn('/path/to/this');
 
-        $this->pdmNodeManager->has('1234')->willReturn(false);
-        $this->pdmNodeManager->has('/path/to/this')->willReturn(false);
-        $this->pdmNodeManager->has('/path/to')->willReturn(false);
+        $this->tdmNodeManager->has('1234')->willReturn(false);
+        $this->tdmNodeManager->has('/path/to/this')->willReturn(false);
+        $this->tdmNodeManager->has('/path/to')->willReturn(false);
 
-        $this->ddmNodeManager->find('/path')->willReturn($this->ddmNode1->reveal());
-        $this->ddmNodeManager->find('/path/to')->willReturn($this->ddmNode2->reveal());
-        $this->ddmNode1->getIdentifier()->willReturn(1);
-        $this->ddmNode2->getIdentifier()->willReturn(2);
+        $this->sdmNodeManager->find('/path')->willReturn($this->sdmNode1->reveal());
+        $this->sdmNodeManager->find('/path/to')->willReturn($this->sdmNode2->reveal());
+        $this->sdmNode1->getIdentifier()->willReturn(1);
+        $this->sdmNode2->getIdentifier()->willReturn(2);
 
-        $this->pdmNodeManager->createPath('/path', 1)->shouldBeCalled();
-        $this->pdmNodeManager->createPath('/path/to', 2)->shouldBeCalled();
-        $this->pdmNodeManager->save()->shouldBeCalled(); // save() hack, see comment in code.
-        $this->pdmRegistry->registerDocument(Argument::cetera())->shouldNotBeCalled();
+        $this->tdmNodeManager->createPath('/path', 1)->shouldBeCalled();
+        $this->tdmNodeManager->createPath('/path/to', 2)->shouldBeCalled();
+        $this->tdmNodeManager->save()->shouldBeCalled(); // save() hack, see comment in code.
+        $this->tdmRegistry->registerDocument(Argument::cetera())->shouldNotBeCalled();
 
-        $this->registrator->registerDocumentWithPDM($this->document->reveal());
+        $this->registrator->registerDocumentWithTDM(
+            $this->document->reveal(),
+            $this->sdm->reveal(),
+            $this->tdm->reveal()
+        );
     }
 
     /**
@@ -243,17 +259,21 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
         $this->metadataFactory->getMetadataForClass(get_class($this->document->reveal()))
             ->willReturn($this->metadata->reveal());
         $this->metadata->getFieldMappings()->willReturn([]);
-        $this->pdmRegistry->hasDocument($this->document->reveal())->willReturn(false);
+        $this->tdmRegistry->hasDocument($this->document->reveal())->willReturn(false);
 
-        $this->ddmInspector->getUuid($this->document->reveal())->willReturn('1234');
-        $this->ddmInspector->getPath($this->document->reveal())->willReturn('/path/to/this');
+        $this->sdmInspector->getUuid($this->document->reveal())->willReturn('1234');
+        $this->sdmInspector->getPath($this->document->reveal())->willReturn('/path/to/this');
 
-        $this->pdmNodeManager->has('1234')->willReturn(false);
-        $this->pdmNodeManager->has('/path/to/this')->willReturn(true);
-        $this->pdmNodeManager->find('/path/to/this')->willReturn($this->pdmNode->reveal());
-        $this->pdmNode->getIdentifier()->willReturn('1234');
+        $this->tdmNodeManager->has('1234')->willReturn(false);
+        $this->tdmNodeManager->has('/path/to/this')->willReturn(true);
+        $this->tdmNodeManager->find('/path/to/this')->willReturn($this->tdmNode->reveal());
+        $this->tdmNode->getIdentifier()->willReturn('1234');
 
-        $this->registrator->registerDocumentWithPDM($this->document->reveal());
+        $this->registrator->registerDocumentWithTDM(
+            $this->document->reveal(),
+            $this->sdm->reveal(),
+            $this->tdm->reveal()
+        );
     }
 
     /**
@@ -263,9 +283,9 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
      */
     public function testRegisterAssociatedDocuments()
     {
-        // we only want to test the associations, so just say that the PDM
+        // we only want to test the associations, so just say that the TDM
         // already has our primary document.
-        $this->pdmRegistry->hasDocument($this->document->reveal())->willReturn(true);
+        $this->tdmRegistry->hasDocument($this->document->reveal())->willReturn(true);
 
         $this->metadataFactory->getMetadataForClass(get_class($this->document->reveal()))
             ->willReturn($this->metadata->reveal());
@@ -282,16 +302,19 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
         $this->metadata->getFieldValue($this->document->reveal(), 'three')
             ->willReturn($this->document1->reveal());
 
-        $this->ddmRegistry->hasDocument($dateTime)->willReturn(false);
-        $this->ddmRegistry->hasDocument($this->document1->reveal())->willReturn(true);
+        $this->sdmRegistry->hasDocument($dateTime)->willReturn(false);
+        $this->sdmRegistry->hasDocument($this->document1->reveal())->willReturn(true);
 
-        // if we check with the PDM registry that document1 exists, then we are
+        // if we check with the TDM registry that document1 exists, then we are
         // already good.
-        $this->pdmRegistry->hasDocument($this->document1->reveal())
+        $this->tdmRegistry->hasDocument($this->document1->reveal())
             ->shouldBeCalled()
             ->willReturn(true);
-
-        $this->registrator->registerDocumentWithPDM($this->document->reveal());
+        $this->registrator->registerDocumentWithTDM(
+            $this->document->reveal(),
+            $this->sdm->reveal(),
+            $this->tdm->reveal()
+        );
     }
 
     /**
@@ -303,19 +326,24 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
         $document = $this->prophesize(SynchronizeBehavior::class)
             ->willImplement(ParentBehavior::class);
 
-        // we only want to test the associations, so just say that the PDM
+        // we only want to test the associations, so just say that the TDM
         // already has our primary document.
 
         $this->metadataFactory->getMetadataForClass(get_class($document->reveal()))
             ->willReturn($this->metadata->reveal());
         $this->metadata->getFieldMappings()->willReturn([]);
+
         $document->getParent()->willReturn($this->document1->reveal());
 
-        $this->pdmRegistry->hasDocument($document->reveal())
+        $this->tdmRegistry->hasDocument($document->reveal())
             ->willReturn(true);
-        $this->pdmRegistry->hasDocument($this->document1->reveal())
+        $this->tdmRegistry->hasDocument($this->document1->reveal())
             ->willReturn(true);
 
-        $this->registrator->registerDocumentWithPDM($document->reveal());
+        $this->registrator->registerDocumentWithTDM(
+            $document->reveal(),
+            $this->sdm->reveal(),
+            $this->tdm->reveal()
+        );
     }
 }
