@@ -92,12 +92,17 @@
             <tag name="sulu_document_manager.event_subscriber" />
         </service>
 
-        <service id="sulu_document_manager.document.subscriber.route"
-                 class="Sulu\Component\Content\Document\Subscriber\RouteSubscriber">
+        <service id="sulu_document_manager.document.subscriber.route_generating"
+                 class="Sulu\Component\Content\Document\Subscriber\RouteGeneratingSubscriber">
             <argument type="service" id="sulu_document_manager.document_manager"/>
             <argument type="service" id="sulu_document_manager.document_inspector"/>
             <argument type="service" id="sulu.phpcr.session"/>
             <tag name="sulu_document_manager.event_subscriber" manager="default" />
+        </service>
+
+        <service id="sulu_document_manager.document.subscriber.route"
+                 class="Sulu\Component\Content\Document\Subscriber\RouteSubscriber">
+            <tag name="sulu_document_manager.event_subscriber" />
         </service>
 
         <service id="sulu_document_manager.document.subscriber.target"
