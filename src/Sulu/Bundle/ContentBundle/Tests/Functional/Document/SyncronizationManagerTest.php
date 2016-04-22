@@ -118,7 +118,7 @@ class SyncronizationManagerTest extends SuluTestCase
         $this->manager->persist($page, 'de');
         $this->manager->flush();
 
-        $this->syncManager->synchronize($page, [ 'flush' => true, 'cascade' => true ]);
+        $this->syncManager->push($page, [ 'flush' => true, 'cascade' => true ]);
 
         $this->assertExistsInPublishDocumentManager($page);
 
@@ -127,7 +127,7 @@ class SyncronizationManagerTest extends SuluTestCase
 
         $this->assertFalse(
             $this->publishDocumentManager->getNodeManager()->has($page->getPath()),
-            'Remove has been propagated to the PDM'
+            'Remove has been propagated to the TDM'
         );
     }
 
@@ -145,11 +145,11 @@ class SyncronizationManagerTest extends SuluTestCase
         $this->manager->persist($page, 'de');
         $this->manager->flush();
 
-        $this->syncManager->synchronize($page, [ 'flush' => true, 'cascade' => true ]);
+        $this->syncManager->push($page, [ 'flush' => true, 'cascade' => true ]);
 
         $this->assertExistsInPublishDocumentManager($page);
 
-        // create a reference property in the PDM
+        // create a reference property in the TDM
         $node = $this->publishDocumentManager->getNodeManager()->createPath('/cmf/sulu_io/content/foobar');
         $node->setProperty(
             'reference', 
@@ -165,7 +165,7 @@ class SyncronizationManagerTest extends SuluTestCase
         // it is a hard reference.
         $this->assertFalse(
             $this->publishDocumentManager->getNodeManager()->has($page->getPath()),
-            'Remove has been propagated to the PDM'
+            'Remove has been propagated to the TDM'
         );
     }
 
@@ -184,12 +184,12 @@ class SyncronizationManagerTest extends SuluTestCase
 
         $this->assertTrue(
             $this->manager->getNodeManager()->has('/cmf/sulu_io/routes/de/foo'),
-            'Route exists in default manager'
+            'Route exists in source manager'
         );
 
         $this->assertFalse(
             $this->publishDocumentManager->getNodeManager()->has('/cmf/sulu_io/routes/de/foo'),
-            'Route does not exist in publish manager'
+            'Route does not exist in target manager'
         );
     }
 
@@ -205,7 +205,7 @@ class SyncronizationManagerTest extends SuluTestCase
 
         $this->manager->persist($page, 'de');
         $this->manager->flush();
-        $this->syncManager->synchronize($page, [ 'flush' => true, 'cascade' => true ]);
+        $this->syncManager->push($page, [ 'flush' => true, 'cascade' => true ]);
 
         $route1 = $this->manager->create('route');
         $route1->setTargetDocument($page);
@@ -222,18 +222,18 @@ class SyncronizationManagerTest extends SuluTestCase
 
         $this->assertTrue(
             $this->publishDocumentManager->getNodeManager()->has('/cmf/sulu_io/routes/de/foobar'),
-            'Route exists in publish document manager'
+            'Route exists in target document manager'
         );
         $this->assertFalse(
             $this->manager->getNodeManager()->has('/cmf/sulu_io/routes/de/foobar'),
-            'Route does not exist in default manager'
+            'Route does not exist in source manager'
         );
 
-        $this->syncManager->synchronize($page, [ 'force' => true, 'flush' => true, 'cascade' => true ]);
+        $this->syncManager->push($page, [ 'force' => true, 'flush' => true, 'cascade' => true ]);
 
         $this->assertFalse(
             $this->publishDocumentManager->getNodeManager()->has('/cmf/sulu_io/routes/de/foobar'),
-            'Route has been removed from publish manager'
+            'Route has been removed from target manager'
         );
     }
 
@@ -262,7 +262,7 @@ class SyncronizationManagerTest extends SuluTestCase
         $this->assertEmpty($page->getSynchronizedManagers());
 
         // synchronize the page, and cascade.
-        $this->syncManager->synchronize($page, [ 'cascade' => true, 'flush' => true ]);
+        $this->syncManager->push($page, [ 'cascade' => true, 'flush' => true ]);
 
         $this->assertEquals($page->getSynchronizedManagers(), [ 'live' ]);
         $this->assertExistsInPublishDocumentManager($page);
@@ -298,7 +298,7 @@ class SyncronizationManagerTest extends SuluTestCase
         $this->manager->persist($page, 'de');
         $this->manager->flush();
 
-        $this->syncManager->synchronize($page, [ 'flush' => true ]);
+        $this->syncManager->push($page, [ 'flush' => true ]);
         $this->assertExistsInPublishDocumentManager($page);
 
         $page = $this->publishDocumentManager->find($page->getUuid(), 'de');
@@ -329,12 +329,12 @@ class SyncronizationManagerTest extends SuluTestCase
     private function assertExistsInPublishDocumentManager($document)
     {
         $path = $this->manager->getInspector()->getPath($document);
-        $this->assertTrue($this->publishDocumentManager->getNodeManager()->has($path), sprintf('Document "%s" exists in PDM', $path));
+        $this->assertTrue($this->publishDocumentManager->getNodeManager()->has($path), sprintf('Document "%s" exists in TDM', $path));
     }
 
     private function assertNotExistsInPublishDocumentManager($document)
     {
         $path = $this->manager->getInspector()->getPath($document);
-        $this->assertFalse($this->publishDocumentManager->getNodeManager()->has($path), 'Page does not exist in PDM');
+        $this->assertFalse($this->publishDocumentManager->getNodeManager()->has($path), 'Page does not exist in TDM');
     }
 }

@@ -26,8 +26,8 @@ use Sulu\Component\DocumentManager\NodeManager;
 /**
  * Abbreviations:.
  *
- * - PDM: Publish document manager.
- * - DDM: Default document manager.
+ * - TDM: Publish document manager.
+ * - SDM: Default document manager.
  */
 class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
 {
@@ -140,7 +140,7 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * If an equivilent document does not exist in the PDM then it should return.
+     * If an equivilent document does not exist in the TDM then it should return.
      */
     public function testRegisterNewDocumentNotExisting()
     {
@@ -158,11 +158,11 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
         $this->pdmRegistry->registerDocument(Argument::cetera())->shouldNotBeCalled();
         $this->pdmNodeManager->find('1234')->willReturn($this->pdmNode->reveal());
 
-        $this->registrator->registerDocumentWithPDM($this->document->reveal());
+        $this->registrator->registerDocumentWithTDM($this->document->reveal());
     }
 
     /**
-     * It should register a document with an existing node in the PDM.
+     * It should register a document with an existing node in the TDM.
      */
     public function testRegisterNewDocumentUuidExists()
     {
@@ -182,11 +182,11 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
             'fr'
         )->shouldBeCalled();
 
-        $this->registrator->registerDocumentWithPDM($this->document->reveal());
+        $this->registrator->registerDocumentWithTDM($this->document->reveal());
     }
 
     /**
-     * If the PDM already has the document then it should return early.
+     * If the TDM already has the document then it should return early.
      */
     public function testRegisterNewDocumentNotHasReturnEarly()
     {
@@ -196,12 +196,12 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
         $this->pdmRegistry->hasDocument($this->document->reveal())->willReturn(true);
 
         $this->pdmRegistry->registerDocument(Argument::cetera())->shouldNotBeCalled();
-        $this->registrator->registerDocumentWithPDM($this->document->reveal());
+        $this->registrator->registerDocumentWithTDM($this->document->reveal());
     }
 
     /**
-     * If the UUID and the path, and parent path do not exist in the PDM
-     * then it should recursively create the ancestor nodes from the DDM
+     * If the UUID and the path, and parent path do not exist in the TDM
+     * then it should recursively create the ancestor nodes from the SDM
      * (retaining the same UUIDs).
      */
     public function testNoneOfUuidPathOrParentPathExist()
@@ -228,7 +228,7 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
         $this->pdmNodeManager->save()->shouldBeCalled(); // save() hack, see comment in code.
         $this->pdmRegistry->registerDocument(Argument::cetera())->shouldNotBeCalled();
 
-        $this->registrator->registerDocumentWithPDM($this->document->reveal());
+        $this->registrator->registerDocumentWithTDM($this->document->reveal());
     }
 
     /**
@@ -253,7 +253,7 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
         $this->pdmNodeManager->find('/path/to/this')->willReturn($this->pdmNode->reveal());
         $this->pdmNode->getIdentifier()->willReturn('1234');
 
-        $this->registrator->registerDocumentWithPDM($this->document->reveal());
+        $this->registrator->registerDocumentWithTDM($this->document->reveal());
     }
 
     /**
@@ -263,7 +263,7 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
      */
     public function testRegisterAssociatedDocuments()
     {
-        // we only want to test the associations, so just say that the PDM
+        // we only want to test the associations, so just say that the TDM
         // already has our primary document.
         $this->pdmRegistry->hasDocument($this->document->reveal())->willReturn(true);
 
@@ -285,13 +285,13 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
         $this->ddmRegistry->hasDocument($dateTime)->willReturn(false);
         $this->ddmRegistry->hasDocument($this->document1->reveal())->willReturn(true);
 
-        // if we check with the PDM registry that document1 exists, then we are
+        // if we check with the TDM registry that document1 exists, then we are
         // already good.
         $this->pdmRegistry->hasDocument($this->document1->reveal())
             ->shouldBeCalled()
             ->willReturn(true);
 
-        $this->registrator->registerDocumentWithPDM($this->document->reveal());
+        $this->registrator->registerDocumentWithTDM($this->document->reveal());
     }
 
     /**
@@ -303,7 +303,7 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
         $document = $this->prophesize(SynchronizeBehavior::class)
             ->willImplement(ParentBehavior::class);
 
-        // we only want to test the associations, so just say that the PDM
+        // we only want to test the associations, so just say that the TDM
         // already has our primary document.
 
         $this->metadataFactory->getMetadataForClass(get_class($document->reveal()))
@@ -316,6 +316,6 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
         $this->pdmRegistry->hasDocument($this->document1->reveal())
             ->willReturn(true);
 
-        $this->registrator->registerDocumentWithPDM($document->reveal());
+        $this->registrator->registerDocumentWithTDM($document->reveal());
     }
 }
