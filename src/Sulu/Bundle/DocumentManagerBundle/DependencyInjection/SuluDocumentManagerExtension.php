@@ -18,6 +18,7 @@ use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\XmlFileLoader;
 use Symfony\Component\DependencyInjection\Reference;
+use Sulu\Component\DocumentManager\DocumentManager;
 
 class SuluDocumentManagerExtension extends Extension implements PrependExtensionInterface
 {
@@ -136,11 +137,20 @@ class SuluDocumentManagerExtension extends Extension implements PrependExtension
             // service using the correct PHPCR session and the event dispatcher
             // defined above.
             $phpcrSessionId = sprintf('doctrine_phpcr.%s_session', $manager['session']);
+            $contextId = sprintf('sulu_document_manager.context.%s', $name);
+            $contextDef = new DefinitionDecorator('sulu_document_manager.abstract_document_manager_context');
+            $contextDef->replaceArgument(0, $name);
+            $contextDef->replaceArgument(1, new Reference($phpcrSessionId));
+            $contextDef->replaceArgument(2, new Reference($dispatcherId));
+            $container->setDefinition($contextId, $contextDef);
+
             $managerId = sprintf('sulu_document_manager.document_manager.%s', $name);
-            $managerDef = new DefinitionDecorator('sulu_document_manager.abstract_document_manager');
-            $managerDef->replaceArgument(0, new Reference($phpcrSessionId));
-            $managerDef->replaceArgument(1, new Reference($dispatcherId));
-            $container->setDefinition($managerId, $managerDef);
+            $managerDef = $container->register(
+                $managerId,
+                DocumentManager::class
+            );
+            $managerDef->addArgument(new Reference($contextId));
+
             $managerMap[$name] = $managerId;
         }
 
@@ -150,6 +160,7 @@ class SuluDocumentManagerExtension extends Extension implements PrependExtension
 
         // create aliases to the default services.
         $container->setAlias('sulu_document_manager.document_manager', 'sulu_document_manager.document_manager.' . $defaultManager);
+        $container->setAlias('sulu_document_manager.context', 'sulu_document_manager.context.' . $defaultManager);
         $container->setAlias('sulu_document_manager.event_dispatcher', 'sulu_document_manager.event_dispatcher.' . $defaultManager);
 
         // set the metadata mapping configuration into the container (it is then

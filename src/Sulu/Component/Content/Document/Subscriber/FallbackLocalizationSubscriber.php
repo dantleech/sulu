@@ -75,16 +75,16 @@ class FallbackLocalizationSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $manager = $event->getManager();
+        $context = $event->getContext();
 
-        $newLocale = $this->getAvailableLocalization($manager->getInspector(), $manager->getRegistry(), $document, $locale);
+        $newLocale = $this->getAvailableLocalization($context->getInspector(), $context->getRegistry(), $document, $locale);
         $event->setLocale($newLocale);
 
         if ($newLocale === $locale) {
             return;
         }
 
-        $registry = $manager->getRegistry();
+        $registry = $context->getRegistry();
         if ($event->getOption('load_ghost_content', true) === true) {
             $registry->updateLocale($document, $newLocale, $locale);
 

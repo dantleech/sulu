@@ -18,6 +18,7 @@ use Sulu\Component\DocumentManager\MetadataFactoryInterface;
 use Sulu\Component\DocumentManager\NamespaceRegistry;
 use Sulu\Component\DocumentManager\PathSegmentRegistry;
 use Sulu\Component\Webspace\Manager\WebspaceManagerInterface;
+use Sulu\Component\DocumentManager\DocumentManagerContext;
 
 class DocumentInspectorFactory implements DocumentInspectorFactoryInterface
 {
@@ -78,17 +79,17 @@ class DocumentInspectorFactory implements DocumentInspectorFactoryInterface
      *
      * {@inheritdoc}
      */
-    public function getInspector(DocumentManagerInterface $manager)
+    public function getInspector(DocumentManagerContext $context)
     {
         if (null !== $this->inspector) {
             return $this->inspector;
         }
 
         $this->inspector = new DocumentInspector(
-            $manager->getRegistry(),
+            $context->getRegistry(),
             $this->pathSegmentRegistry,
             $this->namespaceRegistry,
-            $manager->getProxyFactory(),
+            $context->getProxyFactory(),
             $this->metadataFactory,
             $this->structureFactory,
             $this->encoder,

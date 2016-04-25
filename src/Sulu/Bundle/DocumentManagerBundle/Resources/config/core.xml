@@ -22,7 +22,8 @@
             <argument>%sulu_document_manager.default_manager%</argument>
         </service>
 
-        <service id="sulu_document_manager.abstract_document_manager" class="Sulu\Component\DocumentManager\DocumentManager" abstract="true">
+        <service id="sulu_document_manager.abstract_document_manager_context" class="Sulu\Component\DocumentManager\DocumentManagerContext" abstract="true">
+            <argument /> <!-- name -->
             <argument /> <!-- the PHPCR session -->
             <argument /> <!-- the event dispatcher -->
             <argument type="service" id="sulu_document_manager.metadata_factory"/>
@@ -82,15 +83,15 @@
         </service>
 
         <service id="sulu_document_manager.node_manager" class="Sulu\Component\DocumentManager\NodeManager">
-            <factory service="sulu_document_manager.document_manager" method="getNodeManager" />
+            <factory service="sulu_document_manager.context" method="getNodeManager" />
         </service>
 
         <service id="sulu_document_manager.document_registry" class="Sulu\Component\DocumentManager\DocumentRegistry">
-            <factory service="sulu_document_manager.document_manager" method="getRegistry" />
+            <factory service="sulu_document_manager.context" method="getRegistry" />
         </service>
 
         <service id="sulu_document_manager.proxy_factory" class="Sulu\Component\DocumentManager\ProxyFactory">
-            <factory service="sulu_document_manager.document_manager" method="getProxyFactor" />
+            <factory service="sulu_document_manager.context" method="getProxyFactor" />
         </service>
 
         <service id="sulu_document_manager.proxy_manager.configuration" class="ProxyManager\Configuration" public="false">
