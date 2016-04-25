@@ -53,9 +53,9 @@ class DocumentInspectorFactory implements DocumentInspectorFactoryInterface
     private $pathSegmentRegistry;
 
     /**
-     * @var DocumentInspector
+     * @var DocumentInspector[]
      */
-    private $inspector;
+    private $inspector = [];
 
     public function __construct(
         PathSegmentRegistry $pathSegmentRegistry,
@@ -81,11 +81,13 @@ class DocumentInspectorFactory implements DocumentInspectorFactoryInterface
      */
     public function getInspector(DocumentManagerContext $context)
     {
-        if (null !== $this->inspector) {
-            return $this->inspector;
+        $hash = spl_object_hash($context);
+
+        if (isset($this->inspector[$hash])) {
+            return $this->inspector[$hash];
         }
 
-        $this->inspector = new DocumentInspector(
+        $inspector = new DocumentInspector(
             $context->getRegistry(),
             $this->pathSegmentRegistry,
             $this->namespaceRegistry,
@@ -96,6 +98,8 @@ class DocumentInspectorFactory implements DocumentInspectorFactoryInterface
             $this->webspaceManager
         );
 
-        return $this->inspector;
+        $this->inspector[$hash] = $inspector;
+
+        return $inspector;
     }
 }

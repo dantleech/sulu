@@ -3,6 +3,7 @@ parameters:
     database.host: localhost
     database.user: root
     database.name: sulu_test
+    database.path: ~
     database.port: ~
     database.password: ~
     database.version: 5.5
