@@ -11,6 +11,7 @@
 
 namespace Sulu\Bundle\DocumentManagerBundle\DependencyInjection;
 
+use Sulu\Component\DocumentManager\DocumentManager;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\DefinitionDecorator;
@@ -38,29 +39,16 @@ class SuluDocumentManagerExtension extends Extension implements PrependExtension
             }
         }
 
-        foreach (array_keys($container->getExtensions()) as $name) {
-            $prependConfig = [];
-            switch ($name) {
-                case 'doctrine_phpcr':
-                    // NOTE: for *SOME REASON* we need to set the ODM key on the
-                    //   DoctrinePhpcrBundle in order that the EntityManager serialization
-                    //   works correctly.
-                    //
-                    //   otherwise this test fails:
-                    //   Sulu\Bundle\SecurityBundle\Tests\Functional\Controller\GroupControllerTest::testPost
-                    //   Undefined property: stdClass::$name
-                    $prependConfig = [
-                        'odm' => [],
-                        'session' => [
-                            'sessions' => $config['sessions'],
-                        ],
-                    ];
-                    break;
-            }
-
-            if ($prependConfig) {
-                $container->prependExtensionConfig($name, $prependConfig);
-            }
+        if ($container->hasExtension('doctrine_phpcr')) {
+            $container->prependExtensionConfig(
+                'doctrine_phpcr', 
+                [
+                    'odm' => [],
+                    'session' => [
+                        'sessions' => $config['sessions'],
+                    ],
+                ]
+            );
         }
 
         if ($container->hasExtension('jms_serializer')) {
@@ -126,21 +114,34 @@ class SuluDocumentManagerExtension extends Extension implements PrependExtension
             // create a concrete event dispatcher for the document manager from
             // the abstract service.  choose either the debug or "standard"
             // dispatcher based on the "debug" flag.
-            $abstractDispatcherId = $debug ? 'sulu_document_manager.abstract_event_dispatcher.debug' : 'sulu_document_manager.abstract_event_dispatcher.standard';
+            $abstractDispatcherId = $debug ? 
+                'sulu_document_manager.abstract_event_dispatcher.debug' : 
+                'sulu_document_manager.abstract_event_dispatcher.standard';
+
             $dispatcherId = sprintf('sulu_document_manager.event_dispatcher.%s', $name);
             $dispatcherDef = new DefinitionDecorator($abstractDispatcherId);
             $dispatcherDef->setPublic(false);
             $container->setDefinition($dispatcherId, $dispatcherDef);
 
-            // create the concrete document manager instance from the abstract
+            // create the concrete document context instance from the abstract
             // service using the correct PHPCR session and the event dispatcher
             // defined above.
             $phpcrSessionId = sprintf('doctrine_phpcr.%s_session', $manager['session']);
+            $contextId = sprintf('sulu_document_manager.context.%s', $name);
+            $contextDef = new DefinitionDecorator('sulu_document_manager.abstract_document_manager_context');
+            $contextDef->replaceArgument(0, $name);
+            $contextDef->replaceArgument(1, new Reference($phpcrSessionId));
+            $contextDef->replaceArgument(2, new Reference($dispatcherId));
+            $container->setDefinition($contextId, $contextDef);
+
+            // define the document manager for the above context.
             $managerId = sprintf('sulu_document_manager.document_manager.%s', $name);
-            $managerDef = new DefinitionDecorator('sulu_document_manager.abstract_document_manager');
-            $managerDef->replaceArgument(0, new Reference($phpcrSessionId));
-            $managerDef->replaceArgument(1, new Reference($dispatcherId));
-            $container->setDefinition($managerId, $managerDef);
+            $managerDef = $container->register(
+                $managerId,
+                DocumentManager::class
+            );
+            $managerDef->addArgument(new Reference($contextId));
+
             $managerMap[$name] = $managerId;
         }
 
@@ -149,8 +150,18 @@ class SuluDocumentManagerExtension extends Extension implements PrependExtension
         $registryDef->replaceArgument(1, $managerMap);
 
         // create aliases to the default services.
-        $container->setAlias('sulu_document_manager.document_manager', 'sulu_document_manager.document_manager.' . $defaultManager);
-        $container->setAlias('sulu_document_manager.event_dispatcher', 'sulu_document_manager.event_dispatcher.' . $defaultManager);
+        $container->setAlias(
+            'sulu_document_manager.document_manager',
+            'sulu_document_manager.document_manager.' . $defaultManager
+        );
+        $container->setAlias(
+            'sulu_document_manager.context',
+            'sulu_document_manager.context.' . $defaultManager
+        );
+        $container->setAlias(
+            'sulu_document_manager.event_dispatcher',
+            'sulu_document_manager.event_dispatcher.' . $defaultManager
+        );
 
         // set the metadata mapping configuration into the container (it is then
         // subsequently used by the MetadataSubscriber).

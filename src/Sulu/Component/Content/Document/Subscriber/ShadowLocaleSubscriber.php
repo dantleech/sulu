@@ -119,7 +119,7 @@ class ShadowLocaleSubscriber implements EventSubscriberInterface
 
         $shadowLocale = $this->getShadowLocale($node, $locale);
         $document->setShadowLocale($shadowLocale);
-        $event->getManager()->getRegistry()->updateLocale($document, $shadowLocale, $locale);
+        $event->getContext()->getRegistry()->updateLocale($document, $shadowLocale, $locale);
         $event->setLocale($shadowLocale);
     }
 

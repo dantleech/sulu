@@ -4,6 +4,7 @@ parameters:
     database.user: root
     database.path: ~
     database.name: sulu_test
+    database.path: ~
     database.port: ~
     database.password: ~
     database.version: 5.5

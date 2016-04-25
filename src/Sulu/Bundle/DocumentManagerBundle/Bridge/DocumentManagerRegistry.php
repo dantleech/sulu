@@ -35,9 +35,9 @@ class DocumentManagerRegistry implements DocumentManagerRegistryInterface
     private $defaultName;
 
     /**
-     * @param ContainerInterface $container Dependency injection container.
+     * @param ContainerInterface $container Dependency injection container
      * @param array $managers Associative array of manager names => service IDs
-     * @param string Default document manager name.
+     * @param string Default document manager name
      */
     public function __construct(
         ContainerInterface $container,

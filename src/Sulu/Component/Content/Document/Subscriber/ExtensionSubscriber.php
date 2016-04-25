@@ -132,8 +132,9 @@ class ExtensionSubscriber implements EventSubscriberInterface
     {
         $document = $event->getDocument();
         $node = $event->getNode();
-        $locale = $event->getManager()->getInspector()->getLocale($document);
-        $webspaceName = $event->getManager()->getInspector()->getWebspace($document);
+        $inspector = $event->getManager()->getInspector();
+        $locale = $inspector->getLocale($document);
+        $webspaceName = $inspector->getWebspace($document);
         $structureType = $document->getStructureType();
 
         if (null === $structureType) {

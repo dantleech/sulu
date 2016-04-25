@@ -91,9 +91,11 @@ class ResourceSegmentSubscriber implements EventSubscriberInterface
             return;
         }
 
+        $inspector = $event->getManager()->getInspector();
+
         $node = $event->getNode();
-        $property = $this->getResourceSegmentProperty($event->getManager()->getInspector(), $document);
-        $originalLocale = $event->getManager()->getInspector()->getOriginalLocale($document);
+        $property = $this->getResourceSegmentProperty($inspector, $document);
+        $originalLocale = $inspector->getOriginalLocale($document);
         $segment = $node->getPropertyValueWithDefault(
             $this->encoder->localizedSystemName(
                 $property->getName(),

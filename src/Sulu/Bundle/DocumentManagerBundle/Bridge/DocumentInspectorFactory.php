@@ -13,12 +13,15 @@ namespace Sulu\Bundle\DocumentManagerBundle\Bridge;
 
 use Sulu\Component\Content\Metadata\Factory\StructureMetadataFactoryInterface;
 use Sulu\Component\DocumentManager\DocumentInspectorFactoryInterface;
-use Sulu\Component\DocumentManager\DocumentManagerInterface;
+use Sulu\Component\DocumentManager\DocumentManagerContext;
 use Sulu\Component\DocumentManager\MetadataFactoryInterface;
 use Sulu\Component\DocumentManager\NamespaceRegistry;
 use Sulu\Component\DocumentManager\PathSegmentRegistry;
 use Sulu\Component\Webspace\Manager\WebspaceManagerInterface;
 
+/**
+ * Creates document inspector instances for a given document manager context.
+ */
 class DocumentInspectorFactory implements DocumentInspectorFactoryInterface
 {
     /**
@@ -52,9 +55,9 @@ class DocumentInspectorFactory implements DocumentInspectorFactoryInterface
     private $pathSegmentRegistry;
 
     /**
-     * @var DocumentInspector
+     * @var DocumentInspector[]
      */
-    private $inspector;
+    private $inspector = [];
 
     public function __construct(
         PathSegmentRegistry $pathSegmentRegistry,
@@ -78,23 +81,27 @@ class DocumentInspectorFactory implements DocumentInspectorFactoryInterface
      *
      * {@inheritdoc}
      */
-    public function getInspector(DocumentManagerInterface $manager)
+    public function getInspector(DocumentManagerContext $context)
     {
-        if (null !== $this->inspector) {
-            return $this->inspector;
+        $hash = spl_object_hash($context);
+
+        if (isset($this->inspector[$hash])) {
+            return $this->inspector[$hash];
         }
 
-        $this->inspector = new DocumentInspector(
-            $manager->getRegistry(),
+        $inspector = new DocumentInspector(
+            $context->getRegistry(),
             $this->pathSegmentRegistry,
             $this->namespaceRegistry,
-            $manager->getProxyFactory(),
+            $context->getProxyFactory(),
             $this->metadataFactory,
             $this->structureFactory,
             $this->encoder,
             $this->webspaceManager
         );
 
-        return $this->inspector;
+        $this->inspector[$hash] = $inspector;
+
+        return $inspector;
     }
 }

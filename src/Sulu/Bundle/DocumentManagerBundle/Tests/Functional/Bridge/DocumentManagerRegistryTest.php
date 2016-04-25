@@ -30,38 +30,38 @@ class DocumentManagerRegistryTest extends SuluTestCase
      */
     public function testWriteToDifferentSessions()
     {
-        $dmDefault = $this->registry->getManager('default');
-        $dmLive = $this->registry->getManager('live');
+        $defaultManager = $this->registry->getManager('default');
+        $liveManager = $this->registry->getManager('live');
 
         $pageDocument = new PageDocument();
         $pageDocument->setStructureType('default');
         $pageDocument->setTitle('Draft');
         $pageDocument->setResourceSegment('/hai');
 
-        $dmDefault->persist($pageDocument, 'de', [
+        $defaultManager->persist($pageDocument, 'de', [
             'path' => '/cmf/sulu_io/contents/home',
         ]);
 
-        $dmDefault->flush();
+        $defaultManager->flush();
 
         $pageDocument->setResourceSegment('/hoo');
-        $dmLive->persist($pageDocument, 'de', [
+        $liveManager->persist($pageDocument, 'de', [
             'path' => '/cmf/sulu_io/contents/home',
             'auto_create' => true,
         ]);
-        $dmLive->flush();
+        $liveManager->flush();
 
-        $dmDefault->persist($pageDocument, 'de', [
+        $defaultManager->persist($pageDocument, 'de', [
             'path' => '/cmf/sulu_io/contents/home',
         ]);
 
-        $dmDefault->flush();
+        $defaultManager->flush();
 
         $pageDocument->setTitle('Live');
         $pageDocument->setResourceSegment('/boo');
-        $dmLive->persist($pageDocument, 'de', [
+        $liveManager->persist($pageDocument, 'de', [
             'path' => '/cmf/sulu_io/contents/home',
         ]);
-        $dmLive->flush();
+        $liveManager->flush();
     }
 }
