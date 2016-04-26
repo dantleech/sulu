@@ -35,7 +35,7 @@ class SyncronizationManagerBaseCase extends SuluTestCase
     /**
      * @var mixed
      */
-    protected $publishDocumentManager;
+    protected $targetContext;
 
     public function setUp()
     {
@@ -43,11 +43,12 @@ class SyncronizationManagerBaseCase extends SuluTestCase
             'environment' => 'multiple_document_managers',
         ]);
 
-        $this->manager = $kernel->getContainer()->get('sulu_document_manager.document_manager');
+        $this->context = $kernel->getContainer()->get('sulu_document_manager.context');
+        $this->manager = $this->context->getManager();
         $this->syncManager = $kernel->getContainer()->get('sulu_content.document.synchronization_manager');
-        $this->publishDocumentManager = $this->syncManager->getTargetDocumentManager();
+        $this->targetContext = $this->syncManager->getTargetContext();
         $this->initPhpcr($kernel);
-        $this->parent = $this->manager->find('/cmf/sulu_io/contents', 'de');
+        $this->parent = $this->context->getManager()->find('/cmf/sulu_io/contents', 'de');
     }
 
     /**
@@ -55,7 +56,7 @@ class SyncronizationManagerBaseCase extends SuluTestCase
      */
     public function testSystemUsesTwoDocumentManagers()
     {
-        $this->assertNotSame($this->manager, $this->syncManager->getTargetDocumentManager());
+        $this->assertNotSame($this->context, $this->syncManager->getTargetContext());
     }
 
     protected function createPage($data)
@@ -74,12 +75,12 @@ class SyncronizationManagerBaseCase extends SuluTestCase
     protected function assertExistsInTargetDocumentManager($document)
     {
         $path = $this->manager->getInspector()->getPath($document);
-        $this->assertTrue($this->publishDocumentManager->getNodeManager()->has($path), sprintf('Document "%s" exists in TDM', $path));
+        $this->assertTrue($this->targetContext->getNodeManager()->has($path), sprintf('Document "%s" exists in TDM', $path));
     }
 
     protected function assertNotExistsInTargetDocumentManager($document)
     {
         $path = $this->manager->getInspector()->getPath($document);
-        $this->assertFalse($this->publishDocumentManager->getNodeManager()->has($path), 'Page does not exist in TDM');
+        $this->assertFalse($this->targetContext->getNodeManager()->has($path), 'Page does not exist in TDM');
     }
 }

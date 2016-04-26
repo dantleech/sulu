@@ -24,6 +24,8 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Sulu\Component\DocumentManager\Event\MoveEvent;
 use Sulu\Component\DocumentManager\Event\AbstractManagerEvent;
 use Sulu\Component\Content\Document\Syncronization\Mapping;
+use Sulu\Component\DocumentManager\DocumentManagerContext;
+use Sulu\Component\DocumentManager\Event\AbstractDocumentManagerContextEvent;
 
 class DocumentSynchronizationSubscriber implements EventSubscriberInterface
 {
@@ -35,7 +37,7 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
     /**
      * @var DocumentManagerInterface
      */
-    private $sourceManager;
+    private $sourceContext;
 
     /**
      * @var object[]
@@ -58,9 +60,9 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
      *       event subscribers to specific document managers this would not
      *       be necessary.
      */
-    public function __construct(DocumentManagerInterface $sourceManager, SynchronizationManager $syncManager, Mapping $mapping)
+    public function __construct(DocumentManagerContext $sourceContext, SynchronizationManager $syncManager, Mapping $mapping)
     {
-        $this->sourceManager = $sourceManager;
+        $this->sourceContext = $sourceContext;
         $this->syncManager = $syncManager;
         $this->mapping = $mapping;
     }
@@ -106,14 +108,14 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
      */
     public function handlePersist(PersistEvent $event)
     {
-        $manager = $event->getManager();
+        $context = $event->getContext();
 
         // do not do anything if the default and target managers are the same.
-        if ($this->sourceManager === $this->syncManager->getTargetDocumentManager()) {
+        if ($this->sourceContext === $this->syncManager->getTargetContext()) {
             return;
         }
 
-        $this->assertEmittingManagerSourceManager($manager);
+        $this->assertEmittingContext($context);
 
         $document = $event->getDocument();
 
@@ -134,7 +136,7 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $inspector = $this->sourceManager->getInspector();
+        $inspector = $this->sourceContext->getInspector();
         $locale = $inspector->getLocale($document);
         $this->persistQueue[] = [
             'document' => $document,
@@ -144,9 +146,9 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
 
     public function handleRemove(RemoveEvent $removeEvent)
     {
-        $manager = $removeEvent->getManager();
+        $context = $removeEvent->getContext();
 
-        $this->assertEmittingManagerSourceManager($manager);
+        $this->assertEmittingContext($context);
 
         $document = $removeEvent->getDocument();
 
@@ -188,14 +190,14 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
             return;
         }
 
-        if ($this->sourceManager === $this->syncManager->getTargetDocumentManager()) {
+        if ($this->sourceContext === $this->syncManager->getTargetContext()) {
             return;
         }
 
-        $manager = $event->getManager();
-        $this->assertEmittingManagerSourceManager($manager);
+        $context = $event->getContext();
+        $this->assertEmittingContext($context);
 
-        $targetManager = $this->syncManager->getTargetDocumentManager();
+        $targetContext = $this->syncManager->getTargetContext();
         $defaultFlush = false;
 
         // process the persistQueue, FIFO (first in, first out)
@@ -209,10 +211,10 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
             // we need to load the document in the locale it was persisted in.
             // note that this should not create any significant overhead as all
             // the data is already in-memory.
-            $inspector = $this->sourceManager->getInspector();
+            $inspector = $this->sourceContext->getInspector();
 
             if ($inspector->getLocale($document) !== $locale) {
-                $this->sourceManager->find($inspector->getUUid($document), $locale);
+                $this->sourceContext->find($inspector->getUUid($document), $locale);
             }
 
             // synchronize the document, cascading the synchronization to any
@@ -227,19 +229,19 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
         // flush both managers. the target manager will then commit
         // the synchronized documents and the source manager will update
         // the "synchronized document managers" field of original documents.
-        $targetManager->flush();
+        $targetContext->getManager()->flush();
 
         // only flush the source manager when objects have been synchronized (
         // not removed).
         if ($defaultFlush) {
-            $this->sourceManager->flush();
+            $this->sourceContext->flush();
         }
     }
 
-    private function assertEmittingManagerSourceManager(DocumentManagerInterface $manager)
+    private function assertEmittingContext(DocumentManagerContext $context)
     {
         // do nothing, see same condition in handlePersist.
-        if ($manager === $this->sourceManager) {
+        if ($context === $this->sourceContext) {
             return;
         }
 
@@ -248,10 +250,10 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
         );
     }
 
-    private function clearSynchronizedManagers(AbstractManagerEvent $event, $document)
+    private function clearSynchronizedManagers(AbstractDocumentManagerContextEvent $event, $document)
     {
         // node is now "dirty" and no longer synchronized with any managers.
-        $metadata = $event->getManager()->getMetadataFactory()->getMetadataForClass(get_class($document));
+        $metadata = $event->getContext()->getMetadataFactory()->getMetadataForClass(get_class($document));
         $metadata->setFieldValue($document, 'synchronizedManagers', []);
     }
 }

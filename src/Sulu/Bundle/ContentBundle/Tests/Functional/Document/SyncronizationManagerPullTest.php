@@ -73,11 +73,11 @@ class SyncronizationManagerPullTest extends SyncronizationManagerBaseCase
         $this->manager->flush();
 
         $this->assertTrue(
-            $this->manager->getNodeManager()->has('/cmf/sulu_io/routes/de/bar/boo'),
+            $this->context->getNodeManager()->has('/cmf/sulu_io/routes/de/bar/boo'),
             'SDM has the new route'
         );
         $this->assertTrue(
-            $this->manager->getNodeManager()->has('/cmf/sulu_io/routes/de/bar'),
+            $this->context->getNodeManager()->has('/cmf/sulu_io/routes/de/bar'),
             'SDM has the old route'
         );
         $this->assertTrue(
@@ -89,16 +89,16 @@ class SyncronizationManagerPullTest extends SyncronizationManagerBaseCase
         $this->syncManager->pull($page, [ 'force' => true, 'cascade' => true, 'flush' => true ]);
 
         $this->assertTrue(
-            $this->manager->getNodeManager()->has('/cmf/sulu_io/routes/de/bar'),
+            $this->context->getNodeManager()->has('/cmf/sulu_io/routes/de/bar'),
             'SDM has the old route'
         );
-        $this->manager->getRegistry()->clear();
+        $this->context->getRegistry()->clear();
         $this->assertFalse(
             $this->manager->find('/cmf/sulu_io/routes/de/bar')->isHistory(),
             'The old route has reverted to the primary route'
         );
         $this->assertFalse(
-            $this->manager->getNodeManager()->has('/cmf/sulu_io/routes/de/bar/boo'),
+            $this->context->getNodeManager()->has('/cmf/sulu_io/routes/de/bar/boo'),
             'SDM does NOT have the new route'
         );
 

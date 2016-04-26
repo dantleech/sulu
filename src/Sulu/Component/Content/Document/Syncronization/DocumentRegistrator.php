@@ -15,6 +15,7 @@ use PHPCR\Util\PathHelper;
 use Sulu\Component\Content\Document\Behavior\SynchronizeBehavior;
 use Sulu\Component\DocumentManager\Behavior\Mapping\ParentBehavior;
 use Sulu\Component\DocumentManager\DocumentManagerInterface;
+use Sulu\Component\DocumentManager\DocumentManagerContext;
 
 /**
  * Class responsible for registering a document from the source document manager
@@ -38,13 +39,13 @@ class DocumentRegistrator
      */
     public function registerDocumentWithTDM(
         SynchronizeBehavior $document, 
-        DocumentManagerInterface $sourceManager, 
-        DocumentManagerInterface $targetManager
+        DocumentManagerContext $sourceContext, 
+        DocumentManagerContext $targetContext
     )
     {
-        $this->registerSingleDocumentWithTDM($document, $sourceManager, $targetManager);
+        $this->registerSingleDocumentWithTDM($document, $sourceContext, $targetContext);
 
-        $metadata = $sourceManager->getMetadataFactory()->getMetadataForClass(get_class($document));
+        $metadata = $sourceContext->getMetadataFactory()->getMetadataForClass(get_class($document));
         // iterate over the field mappings for the document, if they resolve to
         // an object then try and register it with the TDM.
         foreach (array_keys($metadata->getFieldMappings()) as $field) {
@@ -57,31 +58,31 @@ class DocumentRegistrator
             // if the source document manager does not have this object then it is
             // not a candidate for being persisted (e.g. it might be a \DateTime
             // object).
-            if (false === $sourceManager->getRegistry()->hasDocument($propertyValue)) {
+            if (false === $sourceContext->getRegistry()->hasDocument($propertyValue)) {
                 continue;
             }
 
-            $this->registerSingleDocumentWithTDM($propertyValue, $sourceManager, $targetManager);
+            $this->registerSingleDocumentWithTDM($propertyValue, $sourceContext, $targetContext);
         }
 
         // TODO: Workaround for the fact that "parent" is not in the metadata,
         // see: https://github.com/sulu-io/sulu-document-manager/issues/67
         if ($document instanceof ParentBehavior) {
             if ($parent = $document->getParent()) {
-                $this->registerSingleDocumentWithTDM($parent, $sourceManager, $targetManager, true);
+                $this->registerSingleDocumentWithTDM($parent, $sourceContext, $targetContext, true);
             }
         }
     }
 
     private function registerSingleDocumentWithTDM(
         $document, 
-        DocumentManagerInterface $sourceManager,
-        DocumentManagerInterface $targetManager,
+        DocumentManagerContext $sourceContext,
+        DocumentManagerContext $targetContext,
         $create = false
     )
     {
-        $sdmInspector = $sourceManager->getInspector();
-        $tdmRegistry = $targetManager->getRegistry();
+        $sdmInspector = $sourceContext->getInspector();
+        $tdmRegistry = $targetContext->getRegistry();
 
         // if the TDM registry already has the document, then
         // there is nothing to do - the document manager will
@@ -94,12 +95,12 @@ class DocumentRegistrator
         // manager create the new node, or, if $create is true, create
         // the missing node (this happens when registering a document
         // which is a relation to the incoming SDM document).
-        if (false === $uuid = $this->resolveTDMUUID($document, $sourceManager, $targetManager)) {
+        if (false === $uuid = $this->resolveTDMUUID($document, $sourceContext, $targetContext)) {
             if (false === $create) {
                 return;
             }
 
-            $targetManager->getNodeManager()->createPath(
+            $targetContext->getNodeManager()->createPath(
                 $sdmInspector->getPath($document), $sdmInspector->getUuid($document)
             );
 
@@ -107,7 +108,7 @@ class DocumentRegistrator
         }
 
         // register the SDM document against the TDM PHPCR node.
-        $node = $targetManager->getNodeManager()->find($uuid);
+        $node = $targetContext->getNodeManager()->find($uuid);
         $locale = $sdmInspector->getLocale($document);
         $tdmRegistry->registerDocument(
             $document,
@@ -135,10 +136,10 @@ class DocumentRegistrator
      * @throws \RuntimeException If the UUID could not be resolved and it would be
      *                           invalid to implicitly allow the node to be created.
      */
-    private function resolveTDMUUID($object, $sourceManager, $targetManager)
+    private function resolveTDMUUID($object, $sourceContext, $targetContext)
     {
-        $tdmNodeManager = $targetManager->getNodeManager();
-        $sdmInspector = $sourceManager->getInspector();
+        $tdmNodeManager = $targetContext->getNodeManager();
+        $sdmInspector = $sourceContext->getInspector();
         $uuid = $sdmInspector->getUUid($object);
 
         if (true === $tdmNodeManager->has($uuid)) {
@@ -154,7 +155,7 @@ class DocumentRegistrator
             // the SDM.
             $parentPath = PathHelper::getParentPath($path);
             if (false === $tdmNodeManager->has($parentPath)) {
-                $this->syncTDMPath($parentPath, $sourceManager, $targetManager);
+                $this->syncTDMPath($parentPath, $sourceContext, $targetContext);
 
                 return false;
             }
@@ -175,10 +176,10 @@ class DocumentRegistrator
      *
      * @param string $path
      */
-    private function syncTDMPath($path, $sourceManager, $targetManager)
+    private function syncTDMPath($path, $sourceContext, $targetContext)
     {
-        $sdmNodeManager = $sourceManager->getNodeManager();
-        $tdmNodeManager = $targetManager->getNodeManager();
+        $sdmNodeManager = $sourceContext->getNodeManager();
+        $tdmNodeManager = $targetContext->getNodeManager();
         $segments = explode('/', $path);
         $stack = [];
 

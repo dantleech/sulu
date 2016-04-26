@@ -37,12 +37,12 @@ class SubscriberDebugCommand extends ContainerAwareCommand
         $registry = $this->getContainer()->get('sulu_document_manager.registry');
 
         if (null === $managerName) {
-            $manager = $registry->getManager();
+            $context = $registry->getContext();
         } else {
-            $manager = $registry->getManager($managerName);
+            $context = $registry->getContext($managerName);
         }
 
-        $dispatcher = $manager->getEventDispatcher();
+        $dispatcher = $context->getEventDispatcher();
 
 
         if (!$eventName) {

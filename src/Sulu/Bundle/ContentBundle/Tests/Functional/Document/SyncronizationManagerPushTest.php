@@ -55,12 +55,12 @@ class SyncronizationManagerPushTest extends SyncronizationManagerBaseCase
 
         $this->manager->persist($page, 'de');
         $this->manager->flush();
-        $this->manager->getNodeManager()->createPath('/cmf/sulu_io/contents/foo/bar');
+        $this->context->getNodeManager()->createPath('/cmf/sulu_io/contents/foo/bar');
         $this->manager->move($page, '/cmf/sulu_io/contents/foo/bar');
         $this->manager->flush();
 
         $this->assertExistsInTargetDocumentManager($page);
-        $page = $this->publishDocumentManager->find($page->getUuid(), 'de');
+        $page = $this->targetContext->getManager()->find($page->getUuid(), 'de');
 
         $this->assertEquals(
             '/cmf/sulu_io/contents/foo/bar/foobar', 
@@ -90,7 +90,7 @@ class SyncronizationManagerPushTest extends SyncronizationManagerBaseCase
         $this->manager->flush();
 
         $this->assertFalse(
-            $this->publishDocumentManager->getNodeManager()->has($page->getPath()),
+            $this->targetContext->getNodeManager()->has($page->getPath()),
             'Remove has been propagated to the TDM'
         );
     }
@@ -114,13 +114,13 @@ class SyncronizationManagerPushTest extends SyncronizationManagerBaseCase
         $this->assertExistsInTargetDocumentManager($page);
 
         // create a reference property in the TDM
-        $node = $this->publishDocumentManager->getNodeManager()->createPath('/cmf/sulu_io/content/foobar');
+        $node = $this->targetContext->getNodeManager()->createPath('/cmf/sulu_io/content/foobar');
         $node->setProperty(
             'reference', 
             $this->manager->getInspector()->getNode($page),
             PropertyType::REFERENCE
         );
-        $this->publishDocumentManager->getNodeManager()->save();
+        $this->targetContext->getNodeManager()->save();
 
         $this->manager->remove($page);
         $this->manager->flush();
@@ -128,7 +128,7 @@ class SyncronizationManagerPushTest extends SyncronizationManagerBaseCase
         // the system would crash if it didn't remove the reference above, as
         // it is a hard reference.
         $this->assertFalse(
-            $this->publishDocumentManager->getNodeManager()->has($page->getPath()),
+            $this->targetContext->getNodeManager()->has($page->getPath()),
             'Remove has been propagated to the TDM'
         );
     }
@@ -147,12 +147,12 @@ class SyncronizationManagerPushTest extends SyncronizationManagerBaseCase
         $this->manager->flush();
 
         $this->assertTrue(
-            $this->manager->getNodeManager()->has('/cmf/sulu_io/routes/de/foo'),
+            $this->context->getNodeManager()->has('/cmf/sulu_io/routes/de/foo'),
             'Route exists in source manager'
         );
 
         $this->assertFalse(
-            $this->publishDocumentManager->getNodeManager()->has('/cmf/sulu_io/routes/de/foo'),
+            $this->targetContext->getNodeManager()->has('/cmf/sulu_io/routes/de/foo'),
             'Route does not exist in target manager'
         );
     }
@@ -175,28 +175,28 @@ class SyncronizationManagerPushTest extends SyncronizationManagerBaseCase
         $route1->setTargetDocument($page);
         $route1->setHistory(true);
 
-        $this->publishDocumentManager->persist(
+        $this->targetContext->getManager()->persist(
             $route1,
             null,
             [
                 'path' => '/cmf/sulu_io/routes/de/foobar'
             ]
         );
-        $this->publishDocumentManager->flush();
+        $this->targetContext->getManager()->flush();
 
         $this->assertTrue(
-            $this->publishDocumentManager->getNodeManager()->has('/cmf/sulu_io/routes/de/foobar'),
+            $this->targetContext->getNodeManager()->has('/cmf/sulu_io/routes/de/foobar'),
             'Route exists in target document manager'
         );
         $this->assertFalse(
-            $this->manager->getNodeManager()->has('/cmf/sulu_io/routes/de/foobar'),
+            $this->context->getNodeManager()->has('/cmf/sulu_io/routes/de/foobar'),
             'Route does not exist in source manager'
         );
 
         $this->syncManager->push($page, [ 'force' => true, 'flush' => true, 'cascade' => true ]);
 
         $this->assertFalse(
-            $this->publishDocumentManager->getNodeManager()->has('/cmf/sulu_io/routes/de/foobar'),
+            $this->targetContext->getNodeManager()->has('/cmf/sulu_io/routes/de/foobar'),
             'Route has been removed from target manager'
         );
     }
@@ -231,7 +231,7 @@ class SyncronizationManagerPushTest extends SyncronizationManagerBaseCase
         $this->assertEquals($page->getSynchronizedManagers(), [ 'live' ]);
         $this->assertExistsInTargetDocumentManager($page);
 
-        $page = $this->publishDocumentManager->find($page->getUuid(), 'de');
+        $page = $this->targetContext->getManager()->find($page->getUuid(), 'de');
         $this->assertEquals('Barbar', $page->getTitle());
 
         // the old route should have been updated and it should now be a
@@ -240,7 +240,7 @@ class SyncronizationManagerPushTest extends SyncronizationManagerBaseCase
         // TODO: We should not couple the test to this behavior, but the overhead
         //       of creating a new document is too great for now.
         //       see: https://github.com/sulu/sulu-document-manager/issues/73
-        $route = $this->publishDocumentManager->find('/cmf/sulu_io/routes/de/bar');
+        $route = $this->targetContext->getManager()->find('/cmf/sulu_io/routes/de/bar');
         $this->assertTrue($route->isHistory());
     }
 
@@ -265,7 +265,7 @@ class SyncronizationManagerPushTest extends SyncronizationManagerBaseCase
         $this->syncManager->push($page, [ 'flush' => true ]);
         $this->assertExistsInTargetDocumentManager($page);
 
-        $page = $this->publishDocumentManager->find($page->getUuid(), 'de');
+        $page = $this->targetContext->getManager()->find($page->getUuid(), 'de');
         $this->assertEquals('Barbar', $page->getTitle());
     }
 

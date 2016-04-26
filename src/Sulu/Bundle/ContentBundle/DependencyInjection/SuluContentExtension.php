@@ -17,6 +17,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\XmlFileLoader;
 use Symfony\Component\HttpKernel\DependencyInjection\Extension;
+use Sulu\Component\Content\Document\SynchronizationManager;
 
 /**
  * This is the class that loads and manages your bundle configuration.
@@ -64,6 +65,19 @@ class SuluContentExtension extends Extension implements PrependExtensionInterfac
                             ],
                         ],
                     ],
+                ]
+            );
+        }
+
+        if ($container->hasExtension('sulu_document_manager')) {
+            $container->prependExtensionConfig(
+                'sulu_document_manager',
+                [
+                    'managers' => [
+                        SynchronizationManager::PASSIVE_MANAGER_NAME => [
+                            'session' => 'default',
+                        ]
+                    ]
                 ]
             );
         }

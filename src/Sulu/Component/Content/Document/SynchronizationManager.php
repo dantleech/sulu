@@ -21,6 +21,7 @@ use Sulu\Component\Content\Document\Syncronization\DocumentRegistrator;
 use Sulu\Component\DocumentManager\Behavior\Mapping\LocaleBehavior;
 use Sulu\Component\Content\Document\Syncronization\Mapping;
 use Sulu\Component\DocumentManager\DocumentManagerInterface;
+use Sulu\Component\DocumentManager\DocumentManagerContext;
 
 /**
  * The synchronization manager handles the synchronization of documents
@@ -30,6 +31,8 @@ use Sulu\Component\DocumentManager\DocumentManagerInterface;
  */
 class SynchronizationManager
 {
+    const PASSIVE_MANAGER_NAME = '_passive_default_manager';
+
     /**
      * @var DocumentManagerRegistryInterface
      */
@@ -43,7 +46,7 @@ class SynchronizationManager
     /**
      * @var string
      */
-    private $targetManagerName;
+    private $targetContextName;
 
     /**
      * @var DocumentRegistrator
@@ -58,17 +61,17 @@ class SynchronizationManager
     public function __construct(
         DocumentManagerRegistry $registry,
         PropertyEncoder $encoder,
-        $targetManagerName,
+        $targetContextName,
         Mapping $mapping,
         $registrator = null
     ) {
         $this->registry = $registry;
-        $this->targetManagerName = $targetManagerName;
+        $this->targetContextName = $targetContextName;
         $this->encoder = $encoder;
         $this->mapping = $mapping;
         $this->registrator = $registrator ?: new DocumentRegistrator(
-            $registry->getManager(),
-            $registry->getManager($this->targetManagerName)
+            $registry->getContext(),
+            $registry->getContext($this->targetContextName)
         );
     }
 
@@ -84,14 +87,9 @@ class SynchronizationManager
      *
      * @return DocumentManagerInterface
      */
-    public function getTargetDocumentManager()
+    public function getTargetContext()
     {
-        return $this->registry->getManager($this->targetManagerName);
-    }
-
-    public function getDefaultDocumentManager()
-    {
-        return $this->registry->getManager();
+        return $this->registry->getContext($this->targetContextName);
     }
 
     /**
@@ -114,10 +112,10 @@ class SynchronizationManager
      */
     public function push(SynchronizeBehavior $document, array $options = [])
     {
-        $sourceManager = $this->registry->getManager();
-        $targetManager = $this->registry->getManager($this->targetManagerName);
+        $sourceContext = $this->registry->getContext();
+        $targetContext = $this->registry->getContext($this->targetContextName);
 
-        $this->synchronize($document, $sourceManager, $targetManager, $options);
+        $this->synchronize($document, $sourceContext, $targetContext, $options);
     }
 
     /**
@@ -140,19 +138,19 @@ class SynchronizationManager
      */
     public function pull(SynchronizeBehavior $document, array $options = [])
     {
-        $defaultManager = $this->getDefaultDocumentManager();
-        $targetManager = $this->getTargetDocumentManager();
+        $sourceContext = $this->registry->getContext(self::PASSIVE_MANAGER_NAME);
+        $targetContext = $this->registry->getContext($this->targetContextName);
 
-        $locale = $defaultManager->getInspector()->getLocale($document);
-        $uuid = $defaultManager->getInspector()->getUuid($document);
+        $locale = $sourceContext->getInspector()->getLocale($document);
+        $uuid = $sourceContext->getInspector()->getUuid($document);
 
         // load the document in the target state
-        $targetManager->find($uuid, $locale);
+        $targetContext->getManager()->find($uuid, $locale);
 
-        $this->synchronize($document, $targetManager, $defaultManager, $options);
+        $this->synchronize($document, $targetContext, $sourceContext, $options);
     }
 
-    private function synchronize(SynchronizeBehavior $document, $sourceManager, $targetManager, array $options = [])
+    private function synchronize(SynchronizeBehavior $document, $sourceContext, $targetContext, array $options = [])
     {
         $options = array_merge([
             'force' => false,
@@ -160,33 +158,32 @@ class SynchronizationManager
             'flush' => false,
         ], $options);
 
-        $this->assertDifferentManagerInstances($sourceManager, $targetManager);
+        $this->assertDifferentContextInstances($sourceContext, $targetContext);
 
         if (false === $options['force'] && $this->isDocumentSynchronized($document)) {
             return;
         }
 
-        $inspector = $sourceManager->getInspector();
+        $inspector = $sourceContext->getInspector();
         $locale = $inspector->getLocale($document);
         $path = $inspector->getPath($document);
 
         // register the SDM document and its immediate relations with the TDM
         // PHPCR node.
-        $this->registrator->registerDocumentWithTDM($document, $sourceManager, $targetManager);
+        $this->registrator->registerDocumentWithTDM($document, $sourceContext, $targetContext);
 
         // save the document with the "publish" document manager.
-        $targetManager->persist(
+        $targetContext->getManager()->persist(
             $document,
             $locale,
             [
-                'safe' => true,
                 'path' => $path,
             ]
         );
         // the document is now synchronized with the publish workspace...
 
         if ($options['cascade']) {
-            $this->cascadeRelations($document, $sourceManager, $targetManager, $options);
+            $this->cascadeRelations($document, $sourceContext, $targetContext, $options);
         }
 
         // TODO: This only applies on PULL
@@ -201,7 +198,7 @@ class SynchronizationManager
         //       it rather than leak localization behavior here, however this is
         //       currently a heavy operation due to the content system and lack of a
         //       UOW.
-        $synced[] = $this->targetManagerName;
+        $synced[] = $this->targetContextName;
 
         // only store unique values: if the sync was forced, then the document
         // may already have the target manager name in its list of synched
@@ -236,20 +233,20 @@ class SynchronizationManager
         $property->setValue($document, $synced);
 
         if ($options['flush']) {
-            $sourceManager->flush();
-            $targetManager->flush();
+            $sourceContext->getManager()->flush();
+            $targetContext->getManager()->flush();
         }
     }
 
     public function remove($document, array $options = [])
     {
-        $sourceManager = $this->getDefaultDocumentManager();
-        $targetManager = $this->getTargetDocumentManager();
+        $sourceContext = $this->registry->getContext();
+        $targetContext = $this->getTargetContext();
 
-        return $this->doRemove($document, $sourceManager, $targetManager, $options);
+        return $this->doRemove($document, $sourceContext, $targetContext, $options);
     }
 
-    private function doRemove($document, $sourceManager, $targetManager, array $options)
+    private function doRemove($document, $sourceContext, $targetContext, array $options)
     {
         $options = array_merge([
             'flush' => false,
@@ -260,17 +257,17 @@ class SynchronizationManager
         // TODO: This should not be necessary, but without it jackalope seems
         //       to have some state problems, possibly related to:
         //       https://github.com/jackalope/jackalope/pull/309
-        $targetManager->flush();
+        $targetContext->getManager()->flush();
 
-        $this->registrator->registerDocumentWithTDM($document, $sourceManager, $targetManager);
-        $targetManager->remove($document);
+        $this->registrator->registerDocumentWithTDM($document, $sourceContext, $targetContext);
+        $targetContext->getManager()->remove($document);
 
         if ($options['flush']) {
-            $targetManager->flush();
+            $targetContext->getManager()->flush();
         }
     }
 
-    private function cascadeRelations($document, $sourceManager, $targetManager, array $options)
+    private function cascadeRelations($document, $sourceContext, $targetContext, array $options)
     {
         $cascadeFqns = $this->mapping->getCascadeReferrers($document);
 
@@ -278,7 +275,7 @@ class SynchronizationManager
             return;
         }
 
-        $referrers = $sourceManager->getInspector()->getReferrers($document);
+        $referrers = $sourceContext->getInspector()->getReferrers($document);
         $sourceReferrerOoids = [];
         foreach ($referrers as $referrer) {
             $sourceReferrerOoids[] = spl_object_hash($referrer);
@@ -290,24 +287,24 @@ class SynchronizationManager
                 }
 
                 $options['flush'] = false;
-                $this->synchronize($referrer, $sourceManager, $targetManager, $options);
+                $this->synchronize($referrer, $sourceContext, $targetContext, $options);
             }
         }
 
-        $uuid = $sourceManager->getInspector()->getUuid($document);
+        $uuid = $sourceContext->getInspector()->getUuid($document);
 
-        if (false === $targetManager->getNodeManager()->has($uuid)) {
+        if (false === $targetContext->getNodeManager()->has($uuid)) {
             return;
         }
 
-        $referrers = $targetManager->getInspector()->getReferrers($document);
+        $referrers = $targetContext->getInspector()->getReferrers($document);
 
         foreach ($referrers as $referrer) {
             if (in_array(spl_object_hash($referrer), $sourceReferrerOoids)) {
                 continue;
             }
 
-            $this->doRemove($referrer, $sourceManager, $targetManager, []);
+            $this->doRemove($referrer, $sourceContext, $targetContext, []);
         }
     }
 
@@ -331,12 +328,12 @@ class SynchronizationManager
 
         // unless forced, we will not process documents which are already
         // synced with the target document manager.
-        return in_array($this->targetManagerName, $synced);
+        return in_array($this->targetContextName, $synced);
     }
 
-    private function assertDifferentManagerInstances(DocumentManagerInterface $manager1, DocumentManagerInterface $manager2)
+    private function assertDifferentContextInstances(DocumentManagerContext $context1, DocumentManagerContext $context2)
     {
-        if ($manager1=== $manager2) {
+        if ($context1=== $context2) {
             throw new \RuntimeException(
                 'Target and source managers are the same instance. You must ' .
                 'either configure different instances or ' .  'disable document ' .
