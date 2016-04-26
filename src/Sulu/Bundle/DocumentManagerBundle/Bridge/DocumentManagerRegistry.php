@@ -27,7 +27,7 @@ class DocumentManagerRegistry implements DocumentManagerRegistryInterface
     /**
      * @var array
      */
-    private $managers;
+    private $contexts;
 
     /**
      * @var string
@@ -36,17 +36,17 @@ class DocumentManagerRegistry implements DocumentManagerRegistryInterface
 
     /**
      * @param ContainerInterface $container Dependency injection container
-     * @param array $managers Associative array of manager names => service IDs
+     * @param array $contexts Associative array of manager names => service IDs
      * @param string Default document manager name
      */
     public function __construct(
         ContainerInterface $container,
-        $managers,
+        array $contexts,
         $defaultName
     ) {
         $this->container = $container;
-        $this->managers = $managers;
         $this->defaultName = $defaultName;
+        $this->contexts = $contexts;
     }
 
     /**
@@ -62,7 +62,7 @@ class DocumentManagerRegistry implements DocumentManagerRegistryInterface
      */
     public function getManagerNames()
     {
-        return array_keys($this->managers);
+        return array_keys($this->contexts);
     }
 
     /**
@@ -70,15 +70,23 @@ class DocumentManagerRegistry implements DocumentManagerRegistryInterface
      */
     public function getManager($name = null)
     {
+        return $this->getContext($name)->getManager();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getContext($name = null)
+    {
         $name = $name ?: $this->defaultName;
 
-        if (!isset($this->managers[$name])) {
+        if (!isset($this->contexts[$name])) {
             throw new \RuntimeException(sprintf(
                 'Manager with name "%s" does not exist. Valid manager names: "%s"',
-                $name, implode('", "', array_keys($this->managers))
+                $name, implode('", "', array_keys($this->contexts))
             ));
         }
 
-        return $this->container->get($this->managers[$name]);
+        return $this->container->get($this->contexts[$name]);
     }
 }

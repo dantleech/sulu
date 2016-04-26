@@ -14,6 +14,7 @@ namespace Sulu\Bundle\DocumentManagerBundle\Tests\Unit\Bridge;
 use Sulu\Bundle\DocumentManagerBundle\Bridge\DocumentManagerRegistry;
 use Sulu\Component\DocumentManager\DocumentManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Sulu\Component\DocumentManager\DocumentManagerContext;
 
 class DocumentManagerRegistryTest extends \PHPUnit_Framework_TestCase
 {
@@ -28,9 +29,9 @@ class DocumentManagerRegistryTest extends \PHPUnit_Framework_TestCase
     private $container;
 
     /**
-     * @var DocumentManagerInterface
+     * @var DocumentManagerContext
      */
-    private $manager;
+    private $context;
 
     public function setUp()
     {
@@ -38,13 +39,14 @@ class DocumentManagerRegistryTest extends \PHPUnit_Framework_TestCase
         $this->registry = new DocumentManagerRegistry(
             $this->container->reveal(),
             [
-                'default' => 'document_manager.1.id',
-                'staging' => 'document_manager.2.id',
-                'live' => 'document_manager.3.id',
+                'default' => 'document_context.1.id',
+                'staging' => 'document_context.2.id',
+                'live' => 'document_context.3.id',
             ],
             'default'
         );
 
+        $this->context = $this->prophesize(DocumentManagerContext::class);
         $this->manager = $this->prophesize(DocumentManagerInterface::class);
     }
 
@@ -60,27 +62,42 @@ class DocumentManagerRegistryTest extends \PHPUnit_Framework_TestCase
     /**
      * It should return the default document managre if no argument given.
      */
-    public function testGetDefaultManager()
+    public function testGetDefaultContext()
     {
-        $this->container->get('document_manager.1.id')->willReturn($this->manager->reveal());
-        $manager = $this->registry->getManager();
+        $this->container->get('document_context.1.id')->willReturn($this->context->reveal());
+        $context = $this->registry->getContext();
         $this->assertSame(
-            $this->manager->reveal(),
-            $manager
+            $this->context->reveal(),
+            $context
         );
     }
 
     /**
-     * It should return the named document manager.
+     * It should return the named document context.
      */
-    public function testNamedDocumentManager()
+    public function testNamedDocumentContext()
     {
-        $this->container->get('document_manager.2.id')->willReturn($this->manager->reveal());
+        $this->container->get('document_context.2.id')->willReturn($this->context->reveal());
+        $context = $this->registry->getContext('staging');
+        $this->assertSame(
+            $this->context->reveal(),
+            $context
+        );
+    }
+
+    /**
+     * It should return the named document manager
+     */
+    public function testGetNamedDocumentManager()
+    {
+        $this->container->get('document_context.2.id')->willReturn($this->context->reveal());
+        $this->context->getManager()->willReturn($this->manager->reveal());
         $manager = $this->registry->getManager('staging');
         $this->assertSame(
             $this->manager->reveal(),
             $manager
         );
+
     }
 
     /**

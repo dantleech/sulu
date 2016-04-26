@@ -19,6 +19,7 @@ use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\XmlFileLoader;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\DependencyInjection\Definition;
 
 class SuluDocumentManagerExtension extends Extension implements PrependExtensionInterface
 {
@@ -108,7 +109,7 @@ class SuluDocumentManagerExtension extends Extension implements PrependExtension
         $container->setParameter('sulu_document_manager.managers', array_keys($config['managers']));
 
         // create the document manager services.
-        $managerMap = [];
+        $contextMap = [];
         $debug = $config['debug'];
         foreach ($config['managers'] as $name => $manager) {
             // create a concrete event dispatcher for the document manager from
@@ -136,18 +137,16 @@ class SuluDocumentManagerExtension extends Extension implements PrependExtension
 
             // define the document manager for the above context.
             $managerId = sprintf('sulu_document_manager.document_manager.%s', $name);
-            $managerDef = $container->register(
-                $managerId,
-                DocumentManager::class
-            );
-            $managerDef->addArgument(new Reference($contextId));
+            $managerDef = new Definition(DocumentManager::class);
+            $managerDef->setFactory([ new Reference($contextId), 'getManager' ]);
+            $container->setDefinition($managerId, $managerDef);
 
-            $managerMap[$name] = $managerId;
+            $contextMap[$name] = $contextId;
         }
 
         // set the document manager service map on the document manager registry.
         $registryDef = $container->getDefinition('sulu_document_manager.registry');
-        $registryDef->replaceArgument(1, $managerMap);
+        $registryDef->replaceArgument(1, $contextMap);
 
         // create aliases to the default services.
         $container->setAlias(
