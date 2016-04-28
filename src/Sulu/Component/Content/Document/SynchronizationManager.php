@@ -22,6 +22,7 @@ use Sulu\Component\DocumentManager\Behavior\Mapping\LocaleBehavior;
 use Sulu\Component\Content\Document\Syncronization\Mapping;
 use Sulu\Component\DocumentManager\DocumentManagerInterface;
 use Sulu\Component\DocumentManager\DocumentManagerContext;
+use Psr\Log\LoggerInterface;
 
 /**
  * The synchronization manager handles the synchronization of documents
@@ -58,12 +59,18 @@ class SynchronizationManager
      */
     private $mapping;
 
+    /**
+     * @var LoggerInterface
+     */
+    private $logger;
+
     public function __construct(
         DocumentManagerRegistry $registry,
         PropertyEncoder $encoder,
         $targetContextName,
         Mapping $mapping,
-        $registrator = null
+        $registrator = null,
+        LoggerInterface $logger = null
     ) {
         $this->registry = $registry;
         $this->targetContextName = $targetContextName;
@@ -73,6 +80,7 @@ class SynchronizationManager
             $registry->getContext(),
             $registry->getContext($this->targetContextName)
         );
+        $this->logger = $logger;
     }
 
     /**
@@ -114,6 +122,12 @@ class SynchronizationManager
     {
         $sourceContext = $this->registry->getContext();
         $targetContext = $this->registry->getContext($this->targetContextName);
+        $this->log(sprintf(
+            'Pushing "%s" to manager from "%s" to "%s"',
+            get_class($document),
+            $sourceContext->getName(),
+            $targetContext->getName()
+        ));
 
         $this->synchronize($document, $sourceContext, $targetContext, $options);
     }
@@ -345,5 +359,14 @@ class SynchronizationManager
                 'synchronization.'
             );
         }
+    }
+
+    private function log($message)
+    {
+        if (null === $this->logger) {
+            return;
+        }
+
+        $this->logger->info($message);
     }
 }

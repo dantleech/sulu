@@ -1,5 +1,6 @@
 sulu_content:    
     synchronize:
+        debug: true
         target_document_manager: live
         default_mapping:
             ## for all documents
@@ -18,7 +19,6 @@ sulu_content:
 
 # Add a live session and document manager to the default configuration
 sulu_document_manager:
-    debug: true
     sessions:
         live:
             backend:

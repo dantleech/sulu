@@ -160,7 +160,13 @@ class SuluContentExtension extends Extension implements PrependExtensionInterfac
         $container->setParameter('sulu.content.document.synchronization.document_manager', $config['target_document_manager']);
         $container->setParameter('sulu.content.document.synchronization.auto_sync', $config['default_mapping']['auto_sync']);
         $container->setParameter('sulu.content.document.synchronization.mapping', $config['mapping']);
+
+        if ($config['debug']) {
+            $container->setAlias('sulu_content.document.synchronization.logger', 'logger');
+        }
+
         $loader->load('document_synchronize.xml');
+
     }
 
     private function processPreview(ContainerBuilder $container, $config)

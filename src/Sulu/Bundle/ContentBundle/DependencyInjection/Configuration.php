@@ -32,6 +32,7 @@ class Configuration implements ConfigurationInterface
                     ->canBeEnabled()
                     ->addDefaultsIfNotSet()
                     ->children()
+                        ->booleanNode('debug')->info('Enable logging')->defaultValue(false)->end()
                         ->scalarNode('target_document_manager')
                             ->info('Name of document manager to be used as the syncrhonization target.')
                             ->defaultValue('default')
