@@ -158,6 +158,10 @@ class SuluDocumentManagerExtension extends Extension implements PrependExtension
             'sulu_document_manager.context.' . $defaultManager
         );
         $container->setAlias(
+            'sulu_document_manager.phpcr_session',
+            sprintf('doctrine_phpcr.%s_session', $defaultManager)
+        );
+        $container->setAlias(
             'sulu_document_manager.event_dispatcher',
             'sulu_document_manager.event_dispatcher.' . $defaultManager
         );

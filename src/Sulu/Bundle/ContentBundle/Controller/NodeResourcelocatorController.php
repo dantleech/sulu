@@ -134,6 +134,6 @@ class NodeResourcelocatorController extends RestController implements ClassResou
      */
     private function getSession()
     {
-        return $this->get('doctrine_phpcr.default_session');
+        return $this->get('sulu_document_manager.phpcr_session');
     }
 }
