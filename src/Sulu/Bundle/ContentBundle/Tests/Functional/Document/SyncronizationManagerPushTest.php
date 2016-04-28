@@ -270,6 +270,29 @@ class SyncronizationManagerPushTest extends SyncronizationManagerBaseCase
     }
 
     /**
+     * It should reset the synched flag when a previously synched document is updated.
+     */
+    public function testPushPreviouslySynched()
+    {
+        // create and force push the document to set the synced flag.
+        $page = $this->createPage([
+            'title' => 'Foobar',
+            'integer' => 1234,
+        ]);
+        $page->setResourceSegment('/bar');
+        $this->manager->persist($page, 'de');
+        $this->manager->flush();
+        $this->syncManager->push($page, [ 'flush' => true, 'force' => true ]);
+
+        $this->assertEquals(['live'], $page->getSynchronizedManagers());
+
+        $page->setTitle('Barbar');
+        $this->manager->persist($page, 'de');
+        $this->manager->flush();
+        $this->assertEquals([], $page->getSynchronizedManagers());
+    }
+
+    /**
      * Snippets (not being mapped) should be automatically created, updated, moved and deleted.
      */
     public function testSnippets()

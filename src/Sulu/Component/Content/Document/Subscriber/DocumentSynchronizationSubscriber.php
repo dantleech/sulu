@@ -124,6 +124,11 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
             return;
         }
 
+        // assume the document has been updated if it has been persisted and
+        // clear the synced managers field (so that it will be synched next time that
+        // sync is called withot the ``force`` option).
+        $this->clearSynchronizedManagers($event, $document);
+
         if (false === $this->mapping->hasAutoSyncPolicy($document, [ 'update', 'create' ])) {
             return;
         }
