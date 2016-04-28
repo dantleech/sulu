@@ -122,12 +122,6 @@ class SynchronizationManager
     {
         $sourceContext = $this->registry->getContext();
         $targetContext = $this->registry->getContext($this->targetContextName);
-        $this->log(sprintf(
-            'Pushing "%s" to manager from "%s" to "%s"',
-            get_class($document),
-            $sourceContext->getName(),
-            $targetContext->getName()
-        ));
 
         $this->synchronize($document, $sourceContext, $targetContext, $options);
     }
@@ -170,12 +164,20 @@ class SynchronizationManager
 
     private function synchronize(SynchronizeBehavior $document, $sourceContext, $targetContext, array $options = [])
     {
-        $sourceContext->getInspector()->getPath($document);
         $options = array_merge([
             'force' => false,
             'cascade' => false,
             'flush' => false,
         ], $options);
+
+        $this->log(sprintf(
+            'Syncing "%s" (%s: %s) from "%s" to "%s"',
+            get_class($document),
+            $sourceContext->getInspector()->getLocale($document),
+            $sourceContext->getInspector()->getPath($document),
+            $sourceContext->getName(),
+            $targetContext->getName()
+        ));
 
         $this->assertDifferentContextInstances($sourceContext, $targetContext);
 
@@ -271,6 +273,15 @@ class SynchronizationManager
             'flush' => false,
         ], $options);
 
+        $this->log(sprintf(
+            'Removing "%s" (%s: %s) from target "%s" (source: "%s")',
+            get_class($document),
+            $targetContext->getInspector()->getLocale($document),
+            $targetContext->getInspector()->getPath($document),
+            $targetContext->getName(),
+            $sourceContext->getName()
+        ));
+
         // Flush the target manager.
         //
         // TODO: This should not be necessary, but without it jackalope seems
@@ -295,15 +306,21 @@ class SynchronizationManager
         }
 
         $referrers = $sourceContext->getInspector()->getReferrers($document);
-        $sourceReferrerOoids = [];
+        $sourceReferrerUuids = [];
         foreach ($referrers as $referrer) {
-            $sourceReferrerOoids[] = spl_object_hash($referrer);
+            $sourceReferrerUuids[] = $sourceContext->getInspector()->getUuid($referrer);
             foreach ($cascadeFqns as $cascadeFqn) {
                 // if the referrer does not an instance of the mapped cascade
                 // class, continue.
                 if (false === $this->isInstanceOf($cascadeFqn, $referrer)) {
                     continue;
                 }
+
+                $this->log(sprintf(
+                    'Cascading %s for %s',
+                    get_class($referrer),
+                    get_class($document)
+                ));
 
                 $options['flush'] = false;
                 $this->synchronize($referrer, $sourceContext, $targetContext, $options);
@@ -319,7 +336,7 @@ class SynchronizationManager
         $referrers = $targetContext->getInspector()->getReferrers($document);
 
         foreach ($referrers as $referrer) {
-            if (in_array(spl_object_hash($referrer), $sourceReferrerOoids)) {
+            if (in_array($targetContext->getInspector()->getUuid($referrer), $sourceReferrerUuids)) {
                 continue;
             }
 
