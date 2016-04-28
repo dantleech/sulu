@@ -16,6 +16,9 @@ use Sulu\Component\Content\Document\Behavior\SynchronizeBehavior;
 use Sulu\Component\DocumentManager\Behavior\Mapping\ParentBehavior;
 use Sulu\Component\DocumentManager\DocumentManagerInterface;
 use Sulu\Component\DocumentManager\DocumentManagerContext;
+use Sulu\Bundle\ContentBundle\Document\RouteDocument;
+use PHPCR\PropertyType;
+use PHPCR\NodeInterface;
 
 /**
  * Class responsible for registering a document from the source document manager
@@ -62,7 +65,7 @@ class DocumentRegistrator
                 continue;
             }
 
-            $this->registerSingleDocumentWithTDM($propertyValue, $sourceContext, $targetContext);
+            $this->registerSingleDocumentWithTDM($propertyValue, $sourceContext, $targetContext, true);
         }
 
         // TODO: Workaround for the fact that "parent" is not in the metadata,
@@ -83,6 +86,7 @@ class DocumentRegistrator
     {
         $sdmInspector = $sourceContext->getInspector();
         $tdmRegistry = $targetContext->getRegistry();
+        $node = null;
 
         // if the TDM registry already has the document, then
         // there is nothing to do - the document manager will
@@ -90,6 +94,7 @@ class DocumentRegistrator
         if (true === $tdmRegistry->hasDocument($document)) {
             return;
         }
+
         // see if we can resolve the corresponding node in the TDM.
         // if we cannot then we either return and let the document
         // manager create the new node, or, if $create is true, create
@@ -100,15 +105,13 @@ class DocumentRegistrator
                 return;
             }
 
-            $targetContext->getNodeManager()->createPath(
+            $node = $targetContext->getNodeManager()->createPath(
                 $sdmInspector->getPath($document), $sdmInspector->getUuid($document)
             );
-
-            return;
         }
 
         // register the SDM document against the TDM PHPCR node.
-        $node = $targetContext->getNodeManager()->find($uuid);
+        $node = $node ?: $targetContext->getNodeManager()->find($uuid);
         $locale = $sdmInspector->getLocale($document);
         $tdmRegistry->registerDocument(
             $document,

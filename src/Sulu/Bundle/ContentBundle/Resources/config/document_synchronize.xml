@@ -12,6 +12,11 @@
             <tag name="console.command" />
         </service>
 
+        <service id="sulu_content.command.synchronize_reset" class="Sulu\Bundle\ContentBundle\Command\SynchronizeResetCommand">
+            <argument type="service" id="sulu_document_manager.registry" />
+            <tag name="console.command" />
+        </service>
+
         <service id="sulu_document_manager.document.subscriber.document_synchronization"
             class="Sulu\Component\Content\Document\Subscriber\DocumentSynchronizationSubscriber">
             <argument type="service" id="sulu_document_manager.context" />

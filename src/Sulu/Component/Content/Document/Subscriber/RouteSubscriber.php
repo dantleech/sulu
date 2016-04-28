@@ -55,5 +55,15 @@ class RouteSubscriber implements EventSubscriberInterface
                 'type' => 'string',
             ]
         );
+
+        // we should add this
+        //$metadata->addFieldMapping(
+            //'targetDocument',
+            //[
+                //'encoding' => 'content',
+                //'property' => 'content',
+                //'type' => 'reference',
+            //]
+        //);
     }
 }

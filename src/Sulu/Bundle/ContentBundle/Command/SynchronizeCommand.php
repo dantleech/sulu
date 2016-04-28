@@ -19,6 +19,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Sulu\Component\Content\Document\Behavior\LocalizedStructureBehavior;
+use Symfony\Component\Console\Input\InputArgument;
 
 /**
  * Manually synchronize all or a set of nodes.
@@ -40,6 +41,7 @@ class SynchronizeCommand extends Command
     public function configure()
     {
         $this->setName('sulu:document:synchronize');
+        $this->addArgument('cmd', InputArgument::REQUIRED, 'Command: push or pull');
         $this->addOption('id', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Document UUID or path to synchronize');
         $this->addOption('locale', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Locale');
         $this->addOption('force', null, InputOption::VALUE_NONE, 'Force sync (ignore flags)');
@@ -56,12 +58,23 @@ class SynchronizeCommand extends Command
         $force = $input->getOption('force');
         $stopOnException = $input->getOption('stop-on-exception');
 
+        // (can't use "command" as it is reserved).
+        $command = $input->getArgument('cmd');
+
+        if (!in_array($command, [ 'push', 'pull' ])) {
+            throw new \InvalidArgumentException(sprintf(
+                'Command must be either "push" or "pull"'
+            ));
+        }
+
+        $pull = $command === 'pull';
+
         if (!empty($ids)) {
             $documents = [];
             foreach ($ids as $id) {
                 $documents[] = $this->defaultManager->find($id);
             }
-            $this->syncDocuments($output, $documents, $locales, $force, $stopOnException);
+            $this->syncDocuments($pull, $output, $documents, $locales, $force, $stopOnException);
 
             return;
         }
@@ -69,10 +82,10 @@ class SynchronizeCommand extends Command
         $query = $this->defaultManager->createQuery('SELECT * FROM [nt:unstructured]');
         $documents = $query->execute();
 
-        $this->syncDocuments($output, $documents, $locales, $force, $stopOnException);
+        $this->syncDocuments($pull, $output, $documents, $locales, $force, $stopOnException);
     }
 
-    private function syncDocuments(OutputInterface $output, $documents, array $locales, $force, $stopOnException)
+    private function syncDocuments($pull = false, OutputInterface $output, $documents, array $locales, $force, $stopOnException)
     {
         if (empty($documents)) {
             return;
@@ -110,12 +123,17 @@ class SynchronizeCommand extends Command
                 $this->defaultManager->find($inspector->getUuid($document), $locale);
 
                 try {
-                    $this->syncManager->push($document, [
-                        'force' => $force,
-                    ]);
+                    $options = [ 'force' => $force, 'cascade' => true ];
+                    if ($pull) {
+                        $this->syncManager->pull($document, $options);
+                    } else {
+                        $this->syncManager->push($document, $options);
+                    }
+
                     $synced = $document->getSynchronizedManagers() ?: [];
                     $output->writeln(sprintf(
-                        '<comment>=></> %s %ss <info>OK</>',
+                        '<comment>%s</> %s %ss <info>OK</>',
+                        $pull ? ' <=' : ' =>',
                         implode(', ', $synced),
                         number_format(microtime(true) - $start, 2)
                     ));
@@ -125,16 +143,17 @@ class SynchronizeCommand extends Command
                         throw $e;
                     }
                     $errors[] = [$inspector->getPath($document), $locale, get_class($e), $e->getMessage()];
-                    $output->writeln(' [<error>ERROR</>]');
+                    $output->writeln(' [<error>ERROR</>] ');
+                    $output->writeln('<error>' . $e->getMessage(). '</error>');
                 }
             }
         }
 
-        $output->write('Flushing target document manager:');
-        $this->syncManager->getPublishDocumentManager()->flush();
         $output->writeln(' [<info>OK</>]');
         $output->write('Flushing source document manager:');
         $this->defaultManager->flush();
+        $output->write('Flushing target document manager:');
+        $this->syncManager->getTargetContext()->getManager()->flush();
         $output->writeln(' [<info>OK</>]');
         $output->writeln(sprintf('%d/%d documents syncronized (inc. localizations)', $syncedCount, $documentCount));
 

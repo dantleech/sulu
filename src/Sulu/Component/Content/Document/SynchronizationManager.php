@@ -144,6 +144,10 @@ class SynchronizationManager
         $locale = $sourceContext->getInspector()->getLocale($document);
         $uuid = $sourceContext->getInspector()->getUuid($document);
 
+        // we need to register the document instance in the target registry
+        // TODO: Test this.
+        $this->registrator->registerDocumentWithTDM($document, $sourceContext, $targetContext);
+
         // load the document in the target state
         $targetContext->getManager()->find($uuid, $locale);
 
@@ -152,6 +156,7 @@ class SynchronizationManager
 
     private function synchronize(SynchronizeBehavior $document, $sourceContext, $targetContext, array $options = [])
     {
+        $sourceContext->getInspector()->getPath($document);
         $options = array_merge([
             'force' => false,
             'cascade' => false,
