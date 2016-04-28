@@ -23,6 +23,7 @@ use Sulu\Component\Content\Document\Syncronization\Mapping;
 use Sulu\Component\DocumentManager\DocumentManagerInterface;
 use Sulu\Component\DocumentManager\DocumentManagerContext;
 use Psr\Log\LoggerInterface;
+use PHPCR\Util\PathHelper;
 
 /**
  * The synchronization manager handles the synchronization of documents
@@ -267,17 +268,21 @@ class SynchronizationManager
         return $this->doRemove($document, $sourceContext, $targetContext, $options);
     }
 
+    /**
+     * Remove the given document from the TARGET document manager.
+     */
     private function doRemove($document, $sourceContext, $targetContext, array $options)
     {
         $options = array_merge([
             'flush' => false,
         ], $options);
 
+        $targetInspector = $targetContext->getInspector();
         $this->log(sprintf(
             'Removing "%s" (%s: %s) from target "%s" (source: "%s")',
             get_class($document),
-            $targetContext->getInspector()->getLocale($document),
-            $targetContext->getInspector()->getPath($document),
+            $targetInspector->getLocale($document),
+            $targetInspector->getPath($document),
             $targetContext->getName(),
             $sourceContext->getName()
         ));
@@ -290,10 +295,44 @@ class SynchronizationManager
         $targetContext->getManager()->flush();
 
         $this->registrator->registerDocumentWithTDM($document, $sourceContext, $targetContext);
+
+        $children = $targetInspector->getChildren($document);
+
+        // in the case that the node has children, we just convert the node
+        // into a generic node instead of deleting it.
+        if ($children->count()) {
+            $this->replaceNodeWithGeneric($document, $targetContext);
+            return;
+        }
+
         $targetContext->getManager()->remove($document);
 
         if ($options['flush']) {
             $targetContext->getManager()->flush();
+        }
+    }
+
+    private function replaceNodeWithGeneric($document, DocumentManagerContext $context)
+    {
+        $inspector = $context->getInspector();
+        $nodeManager = $context->getNodeManager();
+        $path = $inspector->getPath($document);
+        $uuid = $inspector->getUuid($document);
+        $node = $inspector->getNode($document);
+
+        $tmpName = '_tmp_' . uniqid() . PathHelper::getNodeName($path);
+        $tmpPath = PathHelper::getParentPath($path) . '/' . $tmpName;
+        $tempNode = $nodeManager->createPath($tmpPath);
+
+        foreach ($node->getNodes() as $child) {
+            $nodeManager->move($child->getIdentifier(), $tmpPath, $child->getName());
+        }
+
+        $nodeManager->remove($uuid);
+        $genericNode = $nodeManager->createPath($path, $uuid);
+
+        foreach ($tempNode->getNodes() as $node) {
+            $nodeManager->move($node->getIdentifier(), $genericNode->getIdentifier(), $node->getName());
         }
     }
 
@@ -333,12 +372,21 @@ class SynchronizationManager
             return;
         }
 
-        $referrers = $targetContext->getInspector()->getReferrers($document);
-
+        // if there are any *additional* referrers, remove them or reset turn
+        // them into "unknown" documents
+        $referrers = $targetContext->getInspector()->getNode($document)->getReferences();
         foreach ($referrers as $referrer) {
-            if (in_array($targetContext->getInspector()->getUuid($referrer), $sourceReferrerUuids)) {
+            $referrer = $referrer->getParent();
+            if (in_array($referrer->getIdentifier(), $sourceReferrerUuids)) {
                 continue;
             }
+
+            // PROBLEM: referrer has the target document from the source context.
+            $referrer = $targetContext->getManager()->find(
+                $referrer->getIdentifier(), 
+                'de', 
+                [ 'rehydrate' => true ]
+            );
 
             $this->doRemove($referrer, $sourceContext, $targetContext, []);
         }

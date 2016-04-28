@@ -219,7 +219,8 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
             $inspector = $this->sourceContext->getInspector();
 
             if ($inspector->getLocale($document) !== $locale) {
-                $this->sourceContext->find($inspector->getUUid($document), $locale);
+                // TODO: This is not tested.
+                $this->sourceContext->getManager()->find($inspector->getUUid($document), $locale);
             }
 
             // synchronize the document, cascading the synchronization to any
@@ -239,7 +240,8 @@ class DocumentSynchronizationSubscriber implements EventSubscriberInterface
         // only flush the source manager when objects have been synchronized (
         // not removed).
         if ($defaultFlush) {
-            $this->sourceContext->flush();
+            // TODO: This is not tested.
+            $this->sourceContext->getManager()->flush();
         }
     }
 

@@ -15,6 +15,7 @@ use Sulu\Bundle\ContentBundle\Document\PageDocument;
 use Sulu\Bundle\TestBundle\Testing\SuluTestCase;
 use PHPCR\PropertyType;
 use Sulu\Bundle\ContentBundle\Document\RouteDocument;
+use Sulu\Component\DocumentManager\Document\UnknownDocument;
 
 /**
  * This test is for the specific requirements of Sulu not the general
@@ -104,5 +105,64 @@ class SyncronizationManagerPullTest extends SyncronizationManagerBaseCase
 
         $page = $this->manager->find($page->getUuid(), 'de');
         $this->assertEquals('Foobar', $page->getTitle());
+    }
+
+    /**
+     * It should restore descendants of deleted nodes to their correct parent.
+     */
+    public function testCascadeRemoveDescendantRestore()
+    {
+        // create a base page and some descendants
+        $page = $this->createPage([
+            'title' => 'Foobar',
+            'integer' => 1234,
+        ]);
+        $page->setResourceSegment('/bar');
+        $this->manager->persist($page, 'de');
+        $child1 = $this->createPage([
+            'title' => 'Barfoo',
+            'integer' => 1234,
+        ]);
+        $child1->setParent($page);
+        $child1->setResourceSegment('/bar/foo');
+        $this->manager->persist($child1, 'de');
+        $child2 = $this->createPage([
+            'title' => 'Foobaz',
+            'integer' => 1234,
+        ]);
+        $child2->setParent($child1);
+        $child2->setResourceSegment('/bar/foo/baz');
+        $this->manager->persist($child2, 'de');
+        $this->manager->flush();
+
+        // reload the page in order that the children are recognized.
+        $this->manager->find($page->getUuid(), 'de');
+
+        // push the initial state to the TDM
+        $this->syncManager->push($page, [ 'cascade' => true, 'flush' => true ]);
+
+        // change the document
+        $page->setResourceSegment('/bob');
+        $this->manager->persist($page, 'de');
+        $this->manager->flush();
+
+        // PULL the page from the TDM to the SDM
+        $this->syncManager->pull($page, [ 'cascade' => true, 'flush' => true ]);
+        $this->context->getManager()->clear();
+
+        $this->assertTrue(
+            $this->context->getNodeManager()->has('/cmf/sulu_io/routes/de/bob'),
+            'SDM has retained the "new" node because it has "active" descendants'
+        );
+        $doc = $this->context->getManager()->find('/cmf/sulu_io/routes/de/bob');
+        $this->assertInstanceOf(
+            UnknownDocument::class,
+            $this->context->getManager()->find('/cmf/sulu_io/routes/de/bob'),
+            'SDM has converted the previously "new" node to a GenericNode (nt:unstructured)'
+        );
+        $this->assertTrue(
+            $this->context->getNodeManager()->has('/cmf/sulu_io/routes/de/bob/foo'),
+            'Descendant exists'
+        );
     }
 }
