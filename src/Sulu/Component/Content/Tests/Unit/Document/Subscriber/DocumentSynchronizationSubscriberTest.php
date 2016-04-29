@@ -21,6 +21,7 @@ use Sulu\Component\DocumentManager\Metadata;
 use Sulu\Component\DocumentManager\MetadataFactoryInterface;
 use Sulu\Component\DocumentManager\Event\MoveEvent;
 use Sulu\Component\Content\Document\Syncronization\Mapping;
+use Sulu\Component\DocumentManager\DocumentManagerContext;
 
 class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
 {
@@ -70,22 +71,28 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
         parent::setUp();
         $this->syncManager = $this->prophesize(SynchronizationManager::class);
         $this->publishManager = $this->prophesize(DocumentManagerInterface::class);
+        $this->publishContext = $this->prophesize(DocumentManagerContext::class);
         $this->mapping = $this->prophesize(Mapping::class);
 
         $this->subscriber = new DocumentSynchronizationSubscriber(
-            $this->manager->reveal(),
+            $this->context->reveal(),
             $this->syncManager->reveal(),
             $this->mapping->reveal()
         );
+        $this->publishContext->getManager()->willReturn($this->publishManager->reveal());
         $this->document = $this->prophesize(SynchronizeBehavior::class);
         $this->inspector = $this->prophesize(DocumentInspector::class);
-        $this->syncManager->getTargetDocumentManager()->willReturn($this->publishManager->reveal());
+        $this->syncManager->getTargetContext()->willReturn($this->publishContext->reveal());
         $this->removeEvent = $this->prophesize(RemoveEvent::class);
         $this->removeEvent->getDocument()->willReturn($this->document->reveal());
-        $this->removeEvent->getManager()->willReturn($this->manager->reveal());
+        $this->removeEvent->getContext()->willReturn($this->context->reveal());
         $this->metadataFactory = $this->prophesize(MetadataFactoryInterface::class);
         $this->metadata = $this->prophesize(Metadata::class);
         $this->moveEvent = $this->prophesize(MoveEvent::class);
+        $this->context->getInspector()->willReturn($this->inspector->reveal());
+        $this->context->getMetadataFactory()->willReturn(
+            $this->metadataFactory->reveal()
+        );
     }
 
     /**
@@ -97,7 +104,7 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
     public function testDoNothingNotDefaultManager()
     {
         $subscriber = new DocumentSynchronizationSubscriber(
-            $this->prophesize(DocumentManagerInterface::class)->reveal(),
+            $this->prophesize(DocumentManagerContext::class)->reveal(),
             $this->syncManager->reveal(),
             $this->mapping->reveal()
         );
@@ -130,6 +137,11 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
         $this->persistEvent->getDocument()->willReturn($this->document->reveal());
         $this->node->isNew()->willReturn(true);
 
+        $this->metadataFactory->getMetadataForClass(get_class($this->document->reveal()))->willReturn(
+            $this->metadata->reveal()
+        );
+        $this->metadata->setFieldValue($this->document->reveal(), 'synchronizedManagers', [])->shouldBeCalled();
+
         $this->manager->getInspector()->willReturn($this->inspector->reveal());
         $this->inspector->getLocale($this->document->reveal())->willReturn($locale);
 
@@ -161,6 +173,11 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
         $this->publishManager->flush()->shouldBeCalled();
         $this->syncManager->push($this->document->reveal(), [ 'cascade' => true ])->shouldBeCalled();
 
+        $this->metadataFactory->getMetadataForClass(get_class($this->document->reveal()))->willReturn(
+            $this->metadata->reveal()
+        );
+        $this->metadata->setFieldValue($this->document->reveal(), 'synchronizedManagers', [])->shouldBeCalled();
+
         $this->subscriber->handlePersist($this->persistEvent->reveal());
         $this->subscriber->handleFlush($this->flushEvent->reveal());
     }
@@ -175,7 +192,7 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
         $this->persistEvent->getDocument()->willReturn($this->document->reveal());
         $this->node->isNew()->willReturn(false);
 
-        $this->manager->getMetadataFactory()->willReturn($this->metadataFactory->reveal());
+        $this->context->getMetadataFactory()->willReturn($this->metadataFactory->reveal());
         $this->metadataFactory->getMetadataForClass(get_class($this->document->reveal()))->willReturn($this->metadata->reveal());
         $this->metadata->setFieldValue($this->document->reveal(), 'synced', 'live');
 
@@ -202,7 +219,7 @@ class DocumentSynchronizationSubscriberTest extends SubscriberTestCase
      */
     public function testMove()
     {
-        $this->manager->getMetadataFactory()->willReturn($this->metadataFactory->reveal());
+        $this->context->getMetadataFactory()->willReturn($this->metadataFactory->reveal());
         $this->metadataFactory->getMetadataForClass(get_class($this->document->reveal()))->willReturn($this->metadata->reveal());
         $this->metadata->setFieldValue($this->document->reveal(), 'synced', 'live');
 

@@ -104,9 +104,9 @@ class ContentMapperSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $manager = $event->getManager();
+        $context = $event->getContext();
 
-        $event = $this->getDeleteEvent($manager->getInspector(), $document);
+        $event = $this->getDeleteEvent($context->getInspector(), $document);
         $this->deleteEvents[spl_object_hash($document)] = $event;
         $this->eventDispatcher->dispatch(
             ContentEvents::NODE_PRE_DELETE,
@@ -159,7 +159,7 @@ class ContentMapperSubscriber implements EventSubscriberInterface
      */
     public function handleFlush(FlushEvent $event)
     {
-        $inspector = $event->getManager()->getInspector();
+        $inspector = $event->getContext()->getInspector();
         foreach ($this->persistEvents as $persistEvent) {
             $document = $persistEvent->getDocument();
             $structure = $this->documentToStructure($inspector, $document);

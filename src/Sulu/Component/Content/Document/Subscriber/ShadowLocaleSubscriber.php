@@ -236,7 +236,8 @@ class ShadowLocaleSubscriber implements EventSubscriberInterface
         $locales = $inspector->getConcreteLocales($document);
         if (!in_array($document->getShadowLocale(), $locales)) {
             $node = $inspector->getNode($document);
-            throw new DocumentManagerException(sprintf(
+            // TODO: Throw a DocumentManager\RuntimeException here instead.
+            throw new \RuntimeException(sprintf(
                 'Attempting to create shadow for "%s" on a non-concrete locale "%s" for document at "%s". Concrete languages are "%s"',
                 $document->getLocale(),
                 $document->getShadowLocale(),
