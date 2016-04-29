@@ -381,11 +381,16 @@ class SynchronizationManager
                 continue;
             }
 
-            // PROBLEM: referrer has the target document from the source context.
+            // TODO: Rehydrate is set to false - if we set rehydrate to true
+            //       then we encounter problems.
+            //
+            //       The target document has the proxy for the source document which
+            //       may have a reference to a non-existing node, even though the
+            //       actual node in the target PHPCR session has no such reference.
             $referrer = $targetContext->getManager()->find(
                 $referrer->getIdentifier(), 
                 'de', 
-                [ 'rehydrate' => true ]
+                [ 'rehydrate' => false ]
             );
 
             $this->doRemove($referrer, $sourceContext, $targetContext, []);
