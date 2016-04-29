@@ -120,7 +120,7 @@ class SynchronizeCommand extends Command
                     $locale === null ? '--' : $locale,
                     $inspector->getPath($document)
                 ));
-                $this->defaultManager->find($inspector->getUuid($document), $locale);
+                $document = $this->defaultManager->find($inspector->getUuid($document), $locale);
 
                 try {
                     $options = [ 'force' => $force, 'cascade' => true ];

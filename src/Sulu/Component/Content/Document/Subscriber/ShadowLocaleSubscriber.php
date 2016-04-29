@@ -21,6 +21,7 @@ use Sulu\Component\DocumentManager\Event\MetadataLoadEvent;
 use Sulu\Component\DocumentManager\Event\PersistEvent;
 use Sulu\Component\DocumentManager\Events;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Sulu\Component\DocumentManager\Exception\DocumentManagerException;
 
 class ShadowLocaleSubscriber implements EventSubscriberInterface
 {
@@ -234,12 +235,12 @@ class ShadowLocaleSubscriber implements EventSubscriberInterface
 
         $locales = $inspector->getConcreteLocales($document);
         if (!in_array($document->getShadowLocale(), $locales)) {
-            $inspector->getNode($document)->revert();
-            throw new \RuntimeException(sprintf(
+            $node = $inspector->getNode($document);
+            throw new DocumentManagerException(sprintf(
                 'Attempting to create shadow for "%s" on a non-concrete locale "%s" for document at "%s". Concrete languages are "%s"',
                 $document->getLocale(),
                 $document->getShadowLocale(),
-                $inspector->getPath($document),
+                $node->getPath(),
                 implode('", "', $locales)
             ));
         }

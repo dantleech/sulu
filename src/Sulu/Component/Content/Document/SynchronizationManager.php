@@ -124,6 +124,13 @@ class SynchronizationManager
         $sourceContext = $this->registry->getContext();
         $targetContext = $this->registry->getContext($this->targetContextName);
 
+        // we do not want the shadow content, we want the original content
+        $sourceContext->getManager()->find(
+            $document->getUuid(), 
+            $sourceContext->getInspector()->getOriginalLocale($document), 
+            ['load_shadow_content' => false ]
+        );
+
         $this->synchronize($document, $sourceContext, $targetContext, $options);
     }
 
@@ -150,7 +157,7 @@ class SynchronizationManager
         $sourceContext = $this->registry->getContext(self::PASSIVE_MANAGER_NAME);
         $targetContext = $this->registry->getContext($this->targetContextName);
 
-        $locale = $sourceContext->getInspector()->getLocale($document);
+        $locale = $sourceContext->getInspector()->getOriginalLocale($document);
         $uuid = $sourceContext->getInspector()->getUuid($document);
 
         // we need to register the document instance in the target registry
@@ -174,7 +181,7 @@ class SynchronizationManager
         $this->log(sprintf(
             'Syncing "%s" (%s: %s) from "%s" to "%s"',
             get_class($document),
-            $sourceContext->getInspector()->getLocale($document),
+            $sourceContext->getInspector()->getOriginalLocale($document),
             $sourceContext->getInspector()->getPath($document),
             $sourceContext->getName(),
             $targetContext->getName()
@@ -187,7 +194,7 @@ class SynchronizationManager
         }
 
         $inspector = $sourceContext->getInspector();
-        $locale = $inspector->getLocale($document);
+        $locale = $inspector->getOriginalLocale($document);
         $path = $inspector->getPath($document);
 
         // register the SDM document and its immediate relations with the TDM
@@ -232,7 +239,7 @@ class SynchronizationManager
             $node->setProperty(
                 $this->encoder->localizedSystemName(
                     SynchronizeBehavior::SYNCED_FIELD,
-                    $inspector->getLocale($document)
+                    $inspector->getOriginalLocale($document)
                 ),
                 $synced
             );
@@ -281,7 +288,7 @@ class SynchronizationManager
         $this->log(sprintf(
             'Removing "%s" (%s: %s) from target "%s" (source: "%s")',
             get_class($document),
-            $targetInspector->getLocale($document),
+            $targetInspector->getOriginalLocale($document),
             $targetInspector->getPath($document),
             $targetContext->getName(),
             $sourceContext->getName()
@@ -374,6 +381,10 @@ class SynchronizationManager
 
         // if there are any *additional* referrers, remove them or reset turn
         // them into "unknown" documents
+        //
+        // we use the raw PHPCR node as wewant to manually retrieve the document
+        // from the manager with rehydrate=false below (otherwise we could use the
+        // document manager to get referrer documents here).
         $referrers = $targetContext->getInspector()->getNode($document)->getReferences();
         foreach ($referrers as $referrer) {
             $referrer = $referrer->getParent();
@@ -389,7 +400,7 @@ class SynchronizationManager
             //       actual node in the target PHPCR session has no such reference.
             $referrer = $targetContext->getManager()->find(
                 $referrer->getIdentifier(), 
-                'de', 
+                $targetContext->getInspector()->getOriginalLocale($document),
                 [ 'rehydrate' => false ]
             );
 

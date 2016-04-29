@@ -299,4 +299,41 @@ class SyncronizationManagerPushTest extends SyncronizationManagerBaseCase
     {
         $this->markTestSkipped('todo');
     }
+
+    /**
+     * It should synchronize shadow pages.
+     */
+    public function testOriginalLocaleUse()
+    {
+        $page = $this->createPage([
+            'title' => 'Foobar',
+            'integer' => 1234,
+        ]);
+        $page->setResourceSegment('/bar');
+        $this->manager->persist($page, 'de');
+
+        // create a shadow
+        $page->setShadowLocaleEnabled(true);
+        $page->setShadowLocale('de');
+        $this->manager->persist($page, 'en');
+        $this->manager->flush();
+
+        // load the document in the original language
+        $this->manager->find($page->getUuid(), 'de');
+
+        // synchronize it
+        $this->syncManager->push($page, [ 'flush' => true, 'force' => true ]);
+
+        // load the document in the shadow langauge
+        $this->manager->find($page->getUuid(), 'en');
+
+        // synchronize it
+        $this->syncManager->push($page, [ 'flush' => true, 'force' => true ]);
+
+        $page = $this->targetContext->getManager()->find($page->getUuid(), 'en');
+
+        $this->assertEquals('de', $page->getShadowLocale(), 'Shadow locale has been set');
+        $this->assertTrue($page->isShadowLocaleEnabled(), 'Shadow locale is enabled');
+        $this->assertEquals('Foobar', $page->getTitle());
+    }
 }
