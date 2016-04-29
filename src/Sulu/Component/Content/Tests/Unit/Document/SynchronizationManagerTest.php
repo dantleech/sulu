@@ -26,6 +26,7 @@ use Sulu\Component\DocumentManager\DocumentManagerInterface;
 use Sulu\Component\DocumentManager\NodeManager;
 use Sulu\Bundle\ContentBundle\Document\PageDocument;
 use Sulu\Component\Content\Document\Syncronization\Mapping;
+use Sulu\Component\DocumentManager\DocumentManagerContext;
 
 
 /**
@@ -78,6 +79,8 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
         $this->registrator = $this->prophesize(DocumentRegistrator::class);
         $this->sdm = $this->prophesize(DocumentManagerInterface::class);
         $this->tdm = $this->prophesize(DocumentManagerInterface::class);
+        $this->sdmContext = $this->prophesize(DocumentManagerContext::class);
+        $this->tdmContext = $this->prophesize(DocumentManagerContext::class);
         $this->route1 = $this->prophesize(RouteDocument::class)
             ->willImplement(SynchronizeBehavior::class);
         $this->sdmInspector = $this->prophesize(DocumentInspector::class);
@@ -86,7 +89,11 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
         $this->mapping = $this->prophesize(Mapping::class);
         $this->nodeManager = $this->prophesize(NodeManager::class);
 
-        $this->sdm->getInspector()->willReturn($this->sdmInspector->reveal());
+        $this->sdmContext->getInspector()->willReturn($this->sdmInspector->reveal());
+        $this->sdmContext->getName()->willReturn('sdm');
+        $this->sdmContext->getManager()->willReturn($this->sdm->reveal());
+        $this->tdmContext->getName()->willReturn('tdm');
+        $this->tdmContext->getManager()->willReturn($this->tdm->reveal());
 
         $this->syncManager = new SynchronizationManager(
             $this->managerRegistry->reveal(),
@@ -106,9 +113,11 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
     {
         $document = new TestDocument([]);
 
-        $this->managerRegistry->getManager()->willReturn($this->sdm->reveal());
-        $this->managerRegistry->getManager('live')->willReturn($this->tdm->reveal());
+        $this->managerRegistry->getContext()->willReturn($this->sdmContext->reveal());
+        $this->managerRegistry->getContext('live')->willReturn($this->tdmContext->reveal());
 
+        $this->sdmInspector->getUuid($document)->willReturn('1234');
+        $this->sdmInspector->getOriginalLocale($document)->willReturn('de');
         $this->sdmInspector->getLocale($document)->willReturn('fr');
         $this->sdmInspector->getPath($document)->willReturn('/path/1');
         $this->sdmInspector->getNode($document)->willReturn($this->sdmNode1->reveal());
@@ -116,7 +125,7 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
         $this->propertyEncoder->systemName(SynchronizeBehavior::SYNCED_FIELD)->shouldBeCalled();
         $this->registrator->registerDocumentWithTDM(
             $document,
-            $this->sdm->reveal(),
+            $this->sdmContext->reveal(),
             $this->tdm->reveal()
         )->shouldBeCalled();
         $this->tdm->persist(
@@ -141,8 +150,8 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
      */
     public function testSynchronizeFullPushAndDefaultManagersAreSame()
     {
-        $this->managerRegistry->getManager()->willReturn($this->sdm->reveal());
-        $this->managerRegistry->getManager('live')->willReturn($this->sdm->reveal());
+        $this->managerRegistry->getContext()->willReturn($this->sdmContext->reveal());
+        $this->managerRegistry->getContext('live')->willReturn($this->sdmContext->reveal());
 
         $this->tdm->persist(Argument::cetera())->shouldNotBeCalled();
 
@@ -162,8 +171,8 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
         $this->mapping->getCascadeReferrers($this->route1->reveal())->willReturn([
         ]);
 
-        $this->managerRegistry->getManager()->willReturn($this->sdm->reveal());
-        $this->managerRegistry->getManager('live')->willReturn($this->tdm->reveal());
+        $this->managerRegistry->getContext()->willReturn($this->sdmContext->reveal());
+        $this->managerRegistry->getContext('live')->willReturn($this->tdm->reveal());
 
         // return one route and one stdClass (the stdClass should be filtered)
         $this->sdmInspector->getReferrers($document)->willReturn([
@@ -195,13 +204,13 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
 
         $this->registrator->registerDocumentWithTDM(
             $document,
-            $this->sdm->reveal(),
-            $this->tdm->reveal()
+            $this->sdmContext->reveal(),
+            $this->tdmContext->reveal()
         )->shouldBeCalled();
         $this->registrator->registerDocumentWithTDM(
             $this->route1->reveal(),
-            $this->sdm->reveal(),
-            $this->tdm->reveal()
+            $this->sdmContext->reveal(),
+            $this->tdmContext->reveal()
         )->shouldBeCalled();
 
         $this->tdm->flush()->shouldNotBeCalled();
@@ -216,8 +225,8 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
     public function testLocalizedPhpcrSyncedProperty()
     {
         $document = new LocalizedTestDocument([], 'fr');
-        $this->managerRegistry->getManager()->willReturn($this->sdm->reveal());
-        $this->managerRegistry->getManager('live')->willReturn($this->tdm->reveal());
+        $this->managerRegistry->getContext()->willReturn($this->sdmContext->reveal());
+        $this->managerRegistry->getContext('live')->willReturn($this->tdm->reveal());
 
         $this->sdmInspector->getLocale($document)->willReturn('fr');
         $this->sdmInspector->getPath($document)->willReturn('/path/1');
@@ -240,8 +249,8 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
     public function testDocumentBelievesItIsSynchronizedNoForce()
     {
         $document = new TestDocument(['live']);
-        $this->managerRegistry->getManager()->willReturn($this->sdm->reveal());
-        $this->managerRegistry->getManager('live')->willReturn($this->tdm->reveal());
+        $this->managerRegistry->getContext()->willReturn($this->sdmContext->reveal());
+        $this->managerRegistry->getContext('live')->willReturn($this->tdm->reveal());
 
         $this->tdm->persist(Argument::cetera())->shouldNotBeCalled();
 
@@ -254,13 +263,13 @@ class SynchronizationManagerTest extends \PHPUnit_Framework_TestCase
     public function testDocumentRemove()
     {
         $document = new TestDocument();
-        $this->managerRegistry->getManager()->willReturn($this->sdm->reveal());
-        $this->managerRegistry->getManager('live')->willReturn($this->tdm->reveal());
+        $this->managerRegistry->getContext()->willReturn($this->sdmContext->reveal());
+        $this->managerRegistry->getContext('live')->willReturn($this->tdm->reveal());
 
         $this->registrator->registerDocumentWithTDM(
             $document,
-            $this->sdm->reveal(),
-            $this->tdm->reveal()
+            $this->sdmContext->reveal(),
+            $this->tdmContext->reveal()
         )->shouldBeCalled();
         $this->tdm->remove($document)->shouldBeCalled();
         $this->tdm->flush()->shouldBeCalled();

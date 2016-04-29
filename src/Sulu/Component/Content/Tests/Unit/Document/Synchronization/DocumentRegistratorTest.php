@@ -22,6 +22,7 @@ use Sulu\Component\DocumentManager\DocumentRegistry;
 use Sulu\Component\DocumentManager\Metadata;
 use Sulu\Component\DocumentManager\MetadataFactoryInterface;
 use Sulu\Component\DocumentManager\NodeManager;
+use Sulu\Component\DocumentManager\DocumentManagerContext;
 
 /**
  * Abbreviations:.
@@ -110,6 +111,8 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
     {
         $this->tdm = $this->prophesize(DocumentManagerInterface::class);
         $this->sdm = $this->prophesize(DocumentManagerInterface::class);
+        $this->tdmContext = $this->prophesize(DocumentManagerContext::class);
+        $this->sdmContext = $this->prophesize(DocumentManagerContext::class);
 
         $this->registrator = new DocumentRegistrator(
             $this->sdm->reveal(),
@@ -131,12 +134,12 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
         $this->metadata = $this->prophesize(Metadata::class);
         $this->metadataFactory = $this->prophesize(MetadataFactoryInterface::class);
 
-        $this->sdm->getMetadataFactory()->willReturn($this->metadataFactory->reveal());
-        $this->sdm->getNodeManager()->willReturn($this->sdmNodeManager->reveal());
-        $this->sdm->getRegistry()->willReturn($this->sdmRegistry->reveal());
-        $this->sdm->getInspector()->willReturn($this->sdmInspector->reveal());
-        $this->tdm->getRegistry()->willReturn($this->tdmRegistry->reveal());
-        $this->tdm->getNodeManager()->willReturn($this->tdmNodeManager->reveal());
+        $this->sdmContext->getMetadataFactory()->willReturn($this->metadataFactory->reveal());
+        $this->sdmContext->getNodeManager()->willReturn($this->sdmNodeManager->reveal());
+        $this->sdmContext->getRegistry()->willReturn($this->sdmRegistry->reveal());
+        $this->sdmContext->getInspector()->willReturn($this->sdmInspector->reveal());
+        $this->tdmContext->getRegistry()->willReturn($this->tdmRegistry->reveal());
+        $this->tdmContext->getNodeManager()->willReturn($this->tdmNodeManager->reveal());
     }
 
     /**
@@ -160,8 +163,8 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
 
         $this->registrator->registerDocumentWithTDM(
             $this->document->reveal(),
-            $this->sdm->reveal(),
-            $this->tdm->reveal()
+            $this->sdmContext->reveal(),
+            $this->tdmContext->reveal()
         );
     }
 
@@ -188,8 +191,8 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
 
         $this->registrator->registerDocumentWithTDM(
             $this->document->reveal(),
-            $this->sdm->reveal(),
-            $this->tdm->reveal()
+            $this->sdmContext->reveal(),
+            $this->tdmContext->reveal()
         );
     }
 
@@ -206,8 +209,8 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
         $this->tdmRegistry->registerDocument(Argument::cetera())->shouldNotBeCalled();
         $this->registrator->registerDocumentWithTDM(
             $this->document->reveal(),
-            $this->sdm->reveal(),
-            $this->tdm->reveal()
+            $this->sdmContext->reveal(),
+            $this->tdmContext->reveal()
         );
     }
 
@@ -242,8 +245,8 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
 
         $this->registrator->registerDocumentWithTDM(
             $this->document->reveal(),
-            $this->sdm->reveal(),
-            $this->tdm->reveal()
+            $this->sdmContext->reveal(),
+            $this->tdmContext->reveal()
         );
     }
 
@@ -271,8 +274,8 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
 
         $this->registrator->registerDocumentWithTDM(
             $this->document->reveal(),
-            $this->sdm->reveal(),
-            $this->tdm->reveal()
+            $this->sdmContext->reveal(),
+            $this->tdmContext->reveal()
         );
     }
 
@@ -312,8 +315,8 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
             ->willReturn(true);
         $this->registrator->registerDocumentWithTDM(
             $this->document->reveal(),
-            $this->sdm->reveal(),
-            $this->tdm->reveal()
+            $this->sdmContext->reveal(),
+            $this->tdmContext->reveal()
         );
     }
 
@@ -342,8 +345,8 @@ class DocumentRegistratorTest extends \PHPUnit_Framework_TestCase
 
         $this->registrator->registerDocumentWithTDM(
             $document->reveal(),
-            $this->sdm->reveal(),
-            $this->tdm->reveal()
+            $this->sdmContext->reveal(),
+            $this->tdmContext->reveal()
         );
     }
 }

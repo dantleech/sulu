@@ -22,6 +22,7 @@ use Sulu\Component\DocumentManager\Event\PersistEvent;
 use Sulu\Component\DocumentManager\Metadata;
 use Sulu\Component\DocumentManager\MetadataFactoryInterface;
 use Sulu\Component\DocumentManager\NodeManager;
+use Sulu\Component\DocumentManager\DocumentManagerContext;
 
 class StructureTypeFilingSubscriberTest extends \PHPUnit_Framework_TestCase
 {
@@ -93,11 +94,13 @@ class StructureTypeFilingSubscriberTest extends \PHPUnit_Framework_TestCase
         $this->metadata = $this->prophesize(Metadata::class);
         $this->parentNode = $this->prophesize(NodeInterface::class);
         $this->manager = $this->prophesize(DocumentManagerInterface::class);
+        $this->context = $this->prophesize(DocumentManagerContext::class);
 
         $this->subscriber = new StructureTypeFilingSubscriber();
 
-        $this->manager->getNodeManager()->willReturn($this->nodeManager->reveal());
+        $this->context->getNodeManager()->willReturn($this->nodeManager->reveal());
         $this->persistEvent->getManager()->willReturn($this->manager->reveal());
+        $this->persistEvent->getNodeManager()->willReturn($this->nodeManager->reveal());
     }
 
     /**

@@ -126,7 +126,7 @@ class SynchronizationManager
 
         // we do not want the shadow content, we want the original content
         $sourceContext->getManager()->find(
-            $document->getUuid(), 
+            $sourceContext->getInspector()->getUuid($document),
             $sourceContext->getInspector()->getOriginalLocale($document), 
             ['load_shadow_content' => false ]
         );
@@ -341,6 +341,10 @@ class SynchronizationManager
         foreach ($tempNode->getNodes() as $node) {
             $nodeManager->move($node->getIdentifier(), $genericNode->getIdentifier(), $node->getName());
         }
+
+        // remove the temporary node
+        // TODO: Test me
+        $nodeManager->remove($tmpPath);
     }
 
     private function cascadeRelations($document, $sourceContext, $targetContext, array $options)
@@ -375,6 +379,8 @@ class SynchronizationManager
 
         $uuid = $sourceContext->getInspector()->getUuid($document);
 
+        // if this is a new node (it doesn't yet exist in the TDM) then we have
+        // nothing more to do
         if (false === $targetContext->getNodeManager()->has($uuid)) {
             return;
         }
