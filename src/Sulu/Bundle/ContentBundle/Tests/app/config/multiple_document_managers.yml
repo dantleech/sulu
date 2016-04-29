@@ -1,0 +1,38 @@
+sulu_content:    
+    synchronize:
+        debug: true
+        target_document_manager: live
+        default_mapping:
+            ## for all documents
+            auto_sync: [ "create", "update", "move", "delete" ]
+        mapping:
+            ## page documents
+            Sulu\Bundle\ContentBundle\Document\BasePageDocument:
+                auto_sync: [ "delete", "move" ]
+                cascade_referrers:
+                    - Sulu\Bundle\ContentBundle\Document\RouteDocument
+            ## route documents
+            Sulu\Bundle\ContentBundle\Document\RouteDocument:
+                auto_sync: [ ]
+                cascade_referrers:
+                    - Sulu\Bundle\ContentBundle\Document\RouteDocument
+
+# Add a live session and document manager to the default configuration
+sulu_document_manager:
+    sessions:
+        live:
+            backend:
+                type: "%phpcr.transport%"
+                url:  "%phpcr.backend_url%"
+            username: "%phpcr.username%"
+            password: "%phpcr.password%"
+            workspace: live
+    managers:
+        live:
+            session: live
+
+monolog:
+    handlers:
+        main:
+            type:   stream
+            path:   "%kernel.logs_dir%/%kernel.environment%.log"

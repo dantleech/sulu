@@ -17,6 +17,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\XmlFileLoader;
 use Symfony\Component\HttpKernel\DependencyInjection\Extension;
+use Sulu\Component\Content\Document\SynchronizationManager;
 
 /**
  * This is the class that loads and manages your bundle configuration.
@@ -68,6 +69,19 @@ class SuluContentExtension extends Extension implements PrependExtensionInterfac
             );
         }
 
+        if ($container->hasExtension('sulu_document_manager')) {
+            $container->prependExtensionConfig(
+                'sulu_document_manager',
+                [
+                    'managers' => [
+                        SynchronizationManager::PASSIVE_MANAGER_NAME => [
+                            'session' => 'default',
+                        ]
+                    ]
+                ]
+            );
+        }
+
         if ($container->hasExtension('fos_rest')) {
             $container->prependExtensionConfig(
                 'fos_rest',
@@ -109,6 +123,63 @@ class SuluContentExtension extends Extension implements PrependExtensionInterfac
         $loader->load('compat.xml');
         $loader->load('document.xml');
         $loader->load('serializer.xml');
+
+        if ($config['synchronize']['enabled']) {
+            $this->processSynchronize($container, $config['synchronize'], $loader);
+        }
+    }
+
+    private function processSynchronize(ContainerBuilder $container, $config, LoaderInterface $loader)
+    {
+        $invalidClasses = [];
+        foreach ($config['mapping'] as $classFqn => $mapping) {
+            // TODO: Also ensure that "primary" synchronization documents implement
+            //       the SynchronizeBehavior
+            if (!class_exists($classFqn)) {
+                $invalidClasses[] = $classFqn;
+                continue;
+            }
+
+            foreach ($mapping['cascade_referrers'] as $classFqn) {
+                if (!class_exists($classFqn)) {
+                    $invalidClasses[] = $classFqn;
+                    break 2;
+                }
+            }
+        }
+
+        if ($invalidClasses) {
+            throw new \RuntimeException(sprintf(
+                'Unknown classes used for synchronization cascade configuration: "%s"',
+                implode('", "', $invalidClasses)
+            ));
+        }
+
+        $container->setParameter('sulu.content.document.synchronization.document_manager', $config['target_document_manager']);
+        $container->setParameter('sulu.content.document.synchronization.auto_sync', $config['default_mapping']['auto_sync']);
+        $container->setParameter('sulu.content.document.synchronization.mapping', $config['mapping']);
+
+        if ($config['debug']) {
+            $container->setAlias('sulu_content.document.synchronization.logger', 'logger');
+        }
+
+        $loader->load('document_synchronize.xml');
+
+    }
+
+    private function processPreview(ContainerBuilder $container, $config)
+    {
+        $container->setParameter('sulu.content.preview.mode', $config['preview']['mode']);
+        $container->setParameter('sulu.content.preview.websocket', $config['preview']['websocket']);
+        $container->setParameter('sulu.content.preview.delay', $config['preview']['delay']);
+        $errorTemplate = null;
+        if (isset($config['preview']['error_template'])) {
+            $errorTemplate = $config['preview']['error_template'];
+        }
+        $container->setParameter(
+            'sulu.content.preview.error_template',
+            $errorTemplate
+        );
     }
 
     private function processTemplates(ContainerBuilder $container, $config)

@@ -27,6 +27,7 @@ sulu_core:
         structure:
              default_type:
                 snippet: "default"
+                home: "default"
              paths:
                  pages:
                      path: %kernel.root_dir%/Resources/pages
@@ -111,7 +112,7 @@ stof_doctrine_extensions:
 # Just a dirty hack to get the jms serializer bundle correctly working
 # https://github.com/schmittjoh/JMSSerializerBundle/pull/270#issuecomment-21171800
 services:
-    jms_serializer.cache_naming_strategy: "@sulu_core.serialize_caching_strategy"
+    jms_serializer.cache_naming_strategy: @sulu_core.serialize_caching_strategy
 
 sulu_test:
     enable_test_user_provider: true
@@ -126,18 +127,9 @@ sulu_document_manager:
             username: "%phpcr.username%"
             password: "%phpcr.password%"
             workspace: "%phpcr.workspace.default%"
-        live:
-            backend:
-                type: "%phpcr.transport%"
-                url:  "%phpcr.backend_url%"
-            username: "%phpcr.username%"
-            password: "%phpcr.password%"
-            workspace: "%phpcr.workspace.live%"
     managers:
         default:
             session: default
-        live:
-            session: live
     mapping:
         page:
             class: Sulu\Bundle\ContentBundle\Document\PageDocument
